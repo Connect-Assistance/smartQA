@@ -18,7 +18,7 @@ new_roles as (
   from new_app,
   (values
     ('admin', 'Acceso total: overview, generar correo, casos, métricas, configuración'),
-    ('configurador', 'Configura el sistema y revisa resultados; no genera correos'),
+    ('configurador', 'Ve todo excepto Configuración — incluye Generar correo'),
     ('analista', 'Genera correos de trazabilidad y ve sus propios casos')
   ) as r(role_name, description)
   returning id, role_name, app_id
@@ -29,7 +29,7 @@ new_perms as (
   from new_roles
   join (values
     ('admin','overview'),('admin','generate'),('admin','casos'),('admin','metricas'),('admin','config'),
-    ('configurador','overview'),('configurador','casos'),('configurador','metricas'),('configurador','config'),
+    ('configurador','overview'),('configurador','generate'),('configurador','casos'),('configurador','metricas'),
     ('analista','generate'),('analista','casos')
   ) as p(role_name, page)
   on new_roles.role_name = p.role_name
@@ -54,4 +54,12 @@ from admin_role;
 -- from agents
 -- join applications on applications.name = 'SmartQA'
 -- join roles on roles.app_id = applications.id and roles.role_name = 'analista'
+-- where agents.email = 'nombre.apellido@connect.inc';
+
+-- Igual, pero para asignar el rol configurador a alguien:
+-- insert into agent_app_roles (agent_id, app_id, role_id, active)
+-- select agents.id, roles.app_id, roles.id, true
+-- from agents
+-- join applications on applications.name = 'SmartQA'
+-- join roles on roles.app_id = applications.id and roles.role_name = 'configurador'
 -- where agents.email = 'nombre.apellido@connect.inc';
