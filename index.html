@@ -63,6 +63,10 @@
   .nav-item.active{background:var(--accent-wash);color:var(--accent-dark);}
 
   .side-bottom{border-top:1px solid var(--border);padding-top:14px;margin-top:10px;}
+  .role-field{margin-bottom:14px;padding:0 8px;}
+  .role-field label{font-size:10.5px;}
+  .role-field select{font-size:12.5px;padding:6px 4px;}
+  .sidebar.collapsed .role-field{display:none;}
   .user-chip{display:flex;align-items:center;gap:10px;padding:6px 8px 12px;}
   .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .u-name{font-size:12.5px;font-weight:600;color:var(--text-900);}
@@ -236,28 +240,35 @@
       <div class="brand-text"><div class="bn">SMART QA</div><div class="bs">Connect · Calidad IA</div></div>
     </div>
     <nav class="side-nav">
-      <button class="nav-item active" data-view="overview" onclick="setView('overview',this)">
+      <button class="nav-item active" data-view="overview" data-key="overview" onclick="setView('overview',this)">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
         <span class="nav-label">Overview</span>
       </button>
-      <button class="nav-item" data-view="generate" onclick="setView('generate',this)">
+      <button class="nav-item" data-view="generate" data-key="generate" onclick="setView('generate',this)">
         <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Generar correo</span>
       </button>
-      <button class="nav-item" data-view="casos" onclick="setView('casos',this)">
+      <button class="nav-item" data-view="casos" data-key="casos" onclick="setView('casos',this)">
         <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
         <span class="nav-label">Casos</span>
       </button>
-      <button class="nav-item" data-view="metricas" onclick="setView('metricas',this)">
+      <button class="nav-item" data-view="metricas" data-key="metricas" onclick="setView('metricas',this)">
         <svg viewBox="0 0 24 24"><line x1="5" y1="20" x2="5" y2="11"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="19" y1="20" x2="19" y2="14"/></svg>
         <span class="nav-label">Métricas</span>
       </button>
-      <button class="nav-item" data-view="placeholder" data-label="Configuración" onclick="setView('placeholder',this,'Configuración')">
+      <button class="nav-item" data-view="placeholder" data-key="config" data-label="Configuración" onclick="setView('placeholder',this,'Configuración')">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.55 1z" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="nav-label">Configuración</span>
       </button>
     </nav>
     <div class="side-bottom">
+      <div class="field role-field"><label>Rol (demo)</label>
+        <select id="role-select" onchange="applyRole(this.value)">
+          <option value="admin">Admin</option>
+          <option value="configurador">Configurador</option>
+          <option value="analista">Analista</option>
+        </select>
+      </div>
       <div class="user-chip">
         <div class="avatar">D</div>
         <div class="user-info"><div class="u-name">Dayana Alvarado</div><div class="u-email">dayana.alvarado@connect.inc</div></div>
@@ -546,7 +557,32 @@ function setView(view, el, label){
 }
 
 function irAGenerar(){
-  setView('generate', document.querySelector('.nav-item[data-view="generate"]'));
+  const genItem = document.querySelector('.nav-item[data-view="generate"]');
+  if(genItem && genItem.style.display === 'none') return;
+  setView('generate', genItem);
+}
+
+/* --- Roles (demo) --- */
+const ROLE_PERMS = {
+  admin: ['overview','generate','casos','metricas','config'],
+  configurador: ['overview','casos','metricas','config'],
+  analista: ['generate','casos']
+};
+
+function applyRole(role){
+  const allowed = ROLE_PERMS[role] || [];
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(item => {
+    const key = item.getAttribute('data-key');
+    item.style.display = allowed.includes(key) ? 'flex' : 'none';
+  });
+  // si la vista activa quedó oculta, saltar a la primera permitida
+  const activeItem = document.querySelector('.nav-item.active');
+  const activeKey = activeItem ? activeItem.getAttribute('data-key') : null;
+  if(!activeKey || !allowed.includes(activeKey)){
+    const first = Array.from(items).find(item => allowed.includes(item.getAttribute('data-key')));
+    if(first) first.click();
+  }
 }
 
 /* --- Casos: datos de ejemplo --- */
@@ -967,6 +1003,7 @@ calls.push({id: ++callSeq, callId:'CO-88240', hora:'14:02', agente:'Laura Gómez
 renderCalls();
 renderCasosTable();
 onMetPaisChange();
+applyRole('admin');
 </script>
 
 </body>
