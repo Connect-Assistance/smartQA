@@ -6,6 +6,7 @@
 <title>SMART QA — Connect</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --sidebar-bg:#FFFFFF;
@@ -63,10 +64,8 @@
   .nav-item.active{background:var(--accent-wash);color:var(--accent-dark);}
 
   .side-bottom{border-top:1px solid var(--border);padding-top:14px;margin-top:10px;}
-  .role-field{margin-bottom:14px;padding:0 8px;}
-  .role-field label{font-size:10.5px;}
-  .role-field select{font-size:12.5px;padding:6px 4px;}
-  .sidebar.collapsed .role-field{display:none;}
+  .u-role{font-size:10.5px;font-weight:700;color:var(--accent);margin-top:2px;letter-spacing:0.02em;}
+  .sidebar.collapsed .u-role{display:none;}
   .user-chip{display:flex;align-items:center;gap:10px;padding:6px 8px 12px;}
   .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .u-name{font-size:12.5px;font-weight:600;color:var(--text-900);}
@@ -262,16 +261,13 @@
       </button>
     </nav>
     <div class="side-bottom">
-      <div class="field role-field"><label>Rol (demo)</label>
-        <select id="role-select" onchange="applyRole(this.value)">
-          <option value="admin">Admin</option>
-          <option value="configurador">Configurador</option>
-          <option value="analista">Analista</option>
-        </select>
-      </div>
       <div class="user-chip">
         <div class="avatar">D</div>
-        <div class="user-info"><div class="u-name">Dayana Alvarado</div><div class="u-email">dayana.alvarado@connect.inc</div></div>
+        <div class="user-info">
+          <div class="u-name">Dayana Alvarado</div>
+          <div class="u-email">dayana.alvarado@connect.inc</div>
+          <div class="u-role" id="role-badge">Cargando rol…</div>
+        </div>
       </div>
       <div class="side-meta">
         <span class="nav-label">v1.0 · demo</span>
@@ -562,21 +558,63 @@ function irAGenerar(){
   setView('generate', genItem);
 }
 
-/* --- Roles (demo) --- */
-const ROLE_PERMS = {
-  admin: ['overview','generate','casos','metricas','config'],
-  configurador: ['overview','casos','metricas','config'],
-  analista: ['generate','casos']
-};
+/* --- RBAC real vía Supabase (mismo proyecto que AuditQA / Panel Agents) --- */
+const SUPABASE_URL = 'https://dednkgonnirybnpktbzp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlZG5rZ29ubmlyeWJucGt0YnpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzM3MTQsImV4cCI6MjA5NTU0OTcxNH0.uesxb4ph8SYKOHR5y6lWBCcl4P3BTOGSpQXZWDoASRQ';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function applyRole(role){
-  const allowed = ROLE_PERMS[role] || [];
+// Todavía no hay login (Firebase Auth) en este demo, así que el email queda
+// fijo acá. Cuando se agregue el login real, este valor debería salir de la
+// sesión autenticada en vez de estar hardcodeado.
+const CURRENT_USER_EMAIL = 'dayana.alvarado@connect.inc';
+
+async function cargarRBAC(){
+  const badge = document.getElementById('role-badge');
+  try {
+    const { data: agent, error: agentErr } = await supabaseClient
+      .from('agents').select('id').eq('email', CURRENT_USER_EMAIL).single();
+    if (agentErr || !agent) throw new Error('Usuario no encontrado en agents.');
+
+    const { data: app, error: appErr } = await supabaseClient
+      .from('applications').select('id').eq('name', 'SmartQA').single();
+    if (appErr || !app) throw new Error('App "SmartQA" no está registrada todavía en Supabase.');
+
+    const { data: assignment, error: roleErr } = await supabaseClient
+      .from('agent_app_roles')
+      .select('role_id, roles(role_name)')
+      .eq('agent_id', agent.id)
+      .eq('app_id', app.id)
+      .eq('active', true)
+      .single();
+    if (roleErr || !assignment) throw new Error('El usuario no tiene un rol asignado para SmartQA.');
+
+    const roleName = assignment.roles.role_name;
+
+    const { data: perms, error: permsErr } = await supabaseClient
+      .from('role_permissions')
+      .select('page')
+      .eq('app_id', app.id)
+      .eq('role', roleName)
+      .eq('allowed', true);
+    if (permsErr) throw permsErr;
+
+    const allowed = (perms || []).map(p => p.page);
+    aplicarPermisos(allowed);
+    badge.textContent = roleName.charAt(0).toUpperCase() + roleName.slice(1);
+
+  } catch (err) {
+    console.error('Error cargando RBAC de SmartQA:', err);
+    badge.textContent = 'Sin rol asignado';
+    aplicarPermisos([]); // sin permisos confirmados, no se muestra nada
+  }
+}
+
+function aplicarPermisos(allowed){
   const items = document.querySelectorAll('.nav-item');
   items.forEach(item => {
     const key = item.getAttribute('data-key');
     item.style.display = allowed.includes(key) ? 'flex' : 'none';
   });
-  // si la vista activa quedó oculta, saltar a la primera permitida
   const activeItem = document.querySelector('.nav-item.active');
   const activeKey = activeItem ? activeItem.getAttribute('data-key') : null;
   if(!activeKey || !allowed.includes(activeKey)){
@@ -1003,7 +1041,8 @@ calls.push({id: ++callSeq, callId:'CO-88240', hora:'14:02', agente:'Laura Gómez
 renderCalls();
 renderCasosTable();
 onMetPaisChange();
-applyRole('admin');
+document.querySelectorAll('.nav-item').forEach(item => item.style.display = 'none'); // oculto hasta resolver RBAC
+cargarRBAC();
 </script>
 
 </body>
