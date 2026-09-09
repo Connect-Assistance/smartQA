@@ -365,25 +365,27 @@
 
               <div class="field-row">
                 <div class="field"><label>Tipo de servicio</label>
-                  <select id="f-tipo" onchange="onTipoChange()">
-                    <option value="Home">Home</option>
-                    <option value="Road">Road</option>
-                    <option value="Mascotas">Mascotas</option>
-                  </select>
-                </div>
-                <div class="field" id="f-servicio-wrap" style="display:none">
-                  <label>Servicio</label>
-                  <select id="f-servicio">
+                  <select id="f-tipo">
+                    <option>Grúa por accidente</option>
                     <option>Cambio de llanta</option>
                     <option>Abasto de combustible</option>
-                    <option>Grúa por accidente</option>
+                    <option>Plomería residencial</option>
+                    <option>Electricidad del hogar</option>
+                    <option>Cerrajería</option>
+                    <option>Fumigación</option>
+                    <option>Reparación de electrodomésticos</option>
+                    <option>Veterinaria a domicilio</option>
                   </select>
                 </div>
+                <div class="field"><label>Placa del vehículo</label><input type="text" id="f-placa" placeholder="Ej. ABC-123 · N/A si no aplica"></div>
               </div>
 
               <div class="field"><label>Dirigido a</label><input type="text" id="f-dirigido" placeholder="Ej. Equipo de Calidad Movistar Home"></div>
               <div class="field"><label>Descripción del caso</label>
                 <textarea id="f-motivo" placeholder="Qué pasó, en pocas palabras…"></textarea>
+              </div>
+              <div class="field"><label>Hallazgos adicionales</label>
+                <textarea id="f-hallazgos" placeholder="Opcional — algo que quieras que el correo mencione además de lo que salga de las llamadas"></textarea>
               </div>
 
               <div class="calls-label">Llamadas analizadas</div>
@@ -676,11 +678,6 @@ function formatFecha(diasAtras){
   return d.toLocaleDateString('es-CR', {day:'2-digit', month:'short', year:'numeric'});
 }
 
-function onTipoChange(){
-  const tipo = document.getElementById('f-tipo').value;
-  document.getElementById('f-servicio-wrap').style.display = (tipo === 'Road') ? 'block' : 'none';
-}
-
 function buscarCaso(){
   const po = document.getElementById('f-po-lookup').value.trim();
   const errSlot = document.getElementById('lookup-error');
@@ -699,8 +696,6 @@ function buscarCaso(){
     document.getElementById('f-operador').value = data.operador;
     document.getElementById('f-cliente').value = data.cliente;
     document.getElementById('f-fecha').value = formatFecha(data.dias);
-    document.getElementById('f-tipo').value = 'Home';
-    onTipoChange();
 
     document.getElementById('stage-lookup').style.display = 'none';
     document.getElementById('stage-details').style.display = 'block';
@@ -795,9 +790,10 @@ function buildPrompt(){
   const fecha = document.getElementById('f-fecha').value || 'No especificada';
   const cliente = document.getElementById('f-cliente').value;
   const tipo = document.getElementById('f-tipo').value;
-  const servicio = (tipo === 'Road') ? document.getElementById('f-servicio').value : '';
+  const placa = document.getElementById('f-placa').value || 'N/A';
   const dirigido = document.getElementById('f-dirigido').value;
   const motivo = document.getElementById('f-motivo').value;
+  const hallazgosAdicionales = document.getElementById('f-hallazgos').value;
 
   let llamadasTxt = '';
   calls.forEach((c,i)=>{
@@ -810,11 +806,14 @@ País: ${pais}
 Aseguradora / Cuenta: ${operador}
 Fecha del evento: ${fecha}
 Cliente: ${cliente}
-Tipo de servicio: ${tipo}${servicio ? ' — ' + servicio : ''}
+Tipo de servicio: ${tipo}
+Placa del vehículo: ${placa}
 Dirigido a: ${dirigido}
 Motivo del caso: ${motivo}
 
 Llamadas analizadas:${llamadasTxt || '\nNo se registraron llamadas.'}
+
+${hallazgosAdicionales ? 'Hallazgos adicionales aportados por el analista (incorporalos en la sección de Hallazgos de calidad, junto a los que salgan del análisis de llamadas, respetando el máximo de 3 puntos):\n' + hallazgosAdicionales : ''}
 
 ${heliosBase64 ? 'Se adjunta una captura de pantalla de Helios como evidencia del caso. Incorporá lo que se observe en la imagen dentro de la descripción del caso, en una sección breve llamada "Evidencia Helios".' : ''}`;
 }
@@ -830,10 +829,10 @@ Reglas de escritura obligatorias:
 
 Estructura obligatoria del correo (en este orden):
 1. Saludo fijo: "Cordial saludo equipo,"
-2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio (y el servicio específico si es Road) y resumen breve del motivo.
+2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio, placa del vehículo (si aplica) y resumen breve del motivo.
 3. Análisis de interacciones: por cada llamada, ID exacto, hora, agente, resumen y una oportunidad de mejora con tres partes: (a) qué pasó en la llamada, (b) por qué afecta al cliente, (c) qué debe mejorar el asesor de forma concreta.
 4. Evidencia Helios, solo si se adjuntó una imagen.
-5. Hallazgos de calidad: máximo 3 puntos, patrones generales, sin repetir las oportunidades de mejora ya mencionadas.
+5. Hallazgos de calidad: máximo 3 puntos, patrones generales, sin repetir las oportunidades de mejora ya mencionadas. Si el analista aportó hallazgos adicionales, incorporalos ahí.
 6. Cierre fijo: "AYUDAMOS PERSONAS"
 7. Firma fija: "Equipo de Calidad y Formación Regional - Connect"
 
