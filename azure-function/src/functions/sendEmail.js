@@ -1,21 +1,64 @@
 const { app } = require('@azure/functions');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * POST /api/sendEmail
  *
- * Body esperado:
+ * Body esperado (viene directo del JSON que devuelve generateEmail):
  * {
- *   "dirigido": "equipo@ejemplo.com",   // destinatario (requerido)
+ *   "dirigido": "equipo@ejemplo.com",     // destinatario (requerido)
  *   "copiaSupervisor": "sup@ejemplo.com", // opcional, va en CC
- *   "po": "45210",
- *   "operador": "Movistar Home",
- *   "cuerpo": "texto completo del correo generado"
+ *   "asunto": "Trazabilidad de calidad – Caso 45210 – Movistar Home",
+ *   "alerta": "VERDE" | "AMARILLO" | "ROJO",
+ *   "alerta_razon": "razón corta",
+ *   "cuerpo": "texto plano completo del correo generado"
  * }
  *
  * Variables de entorno (App Settings en Azure, nunca hardcodeadas):
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_APP_PASSWORD, ALLOWED_ORIGIN
  */
+
+const SEMAFORO_COLORS = {
+  VERDE:    { bg: '#E4F5EC', fg: '#1E8E5A', label: 'Verde' },
+  AMARILLO: { bg: '#FDF1DD', fg: '#B9720C', label: 'Amarillo' },
+  ROJO:     { bg: '#FBE7E2', fg: '#C5432A', label: 'Rojo' },
+};
+
+const TEMPLATE_PATH = path.join(__dirname, '..', '..', 'templates', 'correo-trazabilidad.html');
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Convierte el texto plano del cuerpo (con \n\n entre párrafos) a HTML seguro para correo.
+function plainTextToHtml(text) {
+  return String(text)
+    .split(/\n\s*\n/)
+    .map(paragraph =>
+      `<p style="margin:0 0 14px;">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`
+    )
+    .join('\n');
+}
+
+function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo }) {
+  const sem = SEMAFORO_COLORS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS.AMARILLO;
+  let html = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+
+  html = html
+    .replaceAll('{{ASUNTO}}', escapeHtml(asunto || ''))
+    .replaceAll('{{SEMAFORO_BG}}', sem.bg)
+    .replaceAll('{{SEMAFORO_FG}}', sem.fg)
+    .replaceAll('{{SEMAFORO_LABEL}}', sem.label)
+    .replaceAll('{{SEMAFORO_RAZON}}', escapeHtml(alerta_razon || ''))
+    .replaceAll('{{CUERPO_HTML}}', plainTextToHtml(cuerpo || ''));
+
+  return html;
+}
 
 function buildTransport() {
   return nodemailer.createTransport({
@@ -52,7 +95,7 @@ app.http('sendEmail', {
       return { status: 400, headers: corsHeaders(), jsonBody: { error: 'Body inválido, se esperaba JSON.' } };
     }
 
-    const { dirigido, copiaSupervisor, po, operador, cuerpo } = body || {};
+    const { dirigido, copiaSupervisor, asunto, alerta, alerta_razon, cuerpo } = body || {};
 
     if (!dirigido || !cuerpo) {
       return { status: 400, headers: corsHeaders(), jsonBody: { error: 'Falta "dirigido" o "cuerpo".' } };
@@ -63,16 +106,18 @@ app.http('sendEmail', {
     }
 
     try {
+      const htmlBody = buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo });
       const transporter = buildTransport();
       const info = await transporter.sendMail({
         from: `"Equipo de Calidad y Formación Regional" <${process.env.SMTP_USER}>`,
         to: dirigido,
         cc: copiaSupervisor || undefined,
-        subject: `Trazabilidad de calidad – Caso ${po || ''} – ${operador || ''}`,
-        text: cuerpo,
+        subject: asunto || 'Trazabilidad de calidad',
+        text: cuerpo,   // fallback en texto plano, por si el cliente de correo no muestra HTML
+        html: htmlBody,
       });
 
-      context.log(`Correo enviado. messageId=${info.messageId} para PO=${po}`);
+      context.log(`Correo enviado. messageId=${info.messageId}`);
       return { status: 200, headers: corsHeaders(), jsonBody: { ok: true, messageId: info.messageId } };
     } catch (err) {
       context.error('Error enviando correo por SMTP:', err);

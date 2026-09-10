@@ -1,0 +1,92 @@
+<!--
+  Plantilla del correo de trazabilidad de calidad — SMART QA / Connect.
+
+  Es HTML "email-safe": todo con tablas y estilos inline, sin flexbox/grid,
+  sin CSS externo ni variables — así se ve igual en Gmail, Outlook, etc.
+  (los clientes de correo no soportan CSS moderno de forma confiable).
+
+  Placeholders a reemplazar desde el backend antes de enviar (ver
+  buildEmailHtml() en azure-function/src/functions/sendEmail.js):
+
+    {{ASUNTO}}          — asunto del correo (texto plano)
+    {{SEMAFORO_BG}}     — color de fondo del badge (hex), ej. #E4F5EC
+    {{SEMAFORO_FG}}     — color de texto del badge (hex), ej. #1E8E5A
+    {{SEMAFORO_LABEL}}  — "Verde" | "Amarillo" | "Rojo"
+    {{SEMAFORO_RAZON}}  — razón corta del semáforo
+    {{CUERPO_HTML}}     — el cuerpo del correo (texto plano del modelo,
+                           ya convertido a párrafos <p> por el backend)
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ASUNTO}}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#F5F6FA; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6FA; padding:24px 0;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:10px; overflow:hidden; border:1px solid #E3E6EE;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background-color:#0C1A3C; padding:20px 28px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-family:Arial, Helvetica, sans-serif; color:#B9C4DC; font-size:12px; font-weight:bold; letter-spacing:1px;">
+                  CONNECT ASISTENCIAS
+                </td>
+              </tr>
+              <tr>
+                <td style="font-family:Arial, Helvetica, sans-serif; color:#FFFFFF; font-size:18px; font-weight:bold; padding-top:2px;">
+                  SMART QA — Trazabilidad de calidad
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Semáforo -->
+        <tr>
+          <td style="padding:20px 28px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background-color:{{SEMAFORO_BG}}; color:{{SEMAFORO_FG}}; font-family:Arial, Helvetica, sans-serif; font-size:12px; font-weight:bold; padding:6px 14px; border-radius:20px;">
+                  {{SEMAFORO_LABEL}}
+                </td>
+                <td style="font-family:Arial, Helvetica, sans-serif; color:#5B647A; font-size:12px; padding-left:10px;">
+                  {{SEMAFORO_RAZON}}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Cuerpo del correo -->
+        <tr>
+          <td style="padding:20px 28px 8px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.6; color:#151E33;">
+            {{CUERPO_HTML}}
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 28px 26px;">
+            <hr style="border:none; border-top:1px solid #E3E6EE; margin:0 0 16px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8890A0;">
+                  Este correo fue generado con SMART QA · Connect Asistencias Extraordinarias
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
