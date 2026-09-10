@@ -41,6 +41,7 @@ az functionapp config appsettings set \
     SMTP_PORT="465" \
     SMTP_USER="dayana.alvarado@connect.inc" \
     SMTP_APP_PASSWORD="<el-app-password-de-16-caracteres>" \
+    ANTHROPIC_API_KEY="<tu-api-key-de-Anthropic>" \
     ALLOWED_ORIGIN="https://quality-sendemail.connectlabs.tech"
 ```
 
@@ -64,12 +65,12 @@ func azure functionapp publish smartqa-send-email
 
 ## 6. Conseguir la Function Key
 
-Portal → la function `sendEmail` → "Function Keys" → copiar `default`.
-Con eso, la URL a llamar desde el demo queda:
+Portal → la function `sendEmail` (o `generateEmail`) → "Function Keys" → copiar `default`.
+Con eso, las URLs a llamar desde el demo quedan:
 
 ```
 https://smartqa-send-email.azurewebsites.net/api/sendEmail?code=<la-function-key>
+https://smartqa-send-email.azurewebsites.net/api/generateEmail?code=<la-function-key>
 ```
 
-Pasale esa URL completa (con el `?code=...`) y la conecto al botón
-"Enviar correo" del demo.
+Pasame esas dos URLs completas (con el `?code=...`) y conecto ambos botones del demo.

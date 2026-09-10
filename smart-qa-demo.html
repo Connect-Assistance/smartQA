@@ -914,6 +914,11 @@ Además, antes que nada, generá una primera línea con este formato exacto:
 SEMAFORO: <VERDE|AMARILLO|ROJO> - <razón en máximo 12 palabras>
 Después de esa línea dejá una línea en blanco y continuá con el correo completo empezando por el saludo.`;
 
+// Cuando tengas la Azure Function de generación deployada, pegá acá su URL
+// completa (con ?code=...). Vacío = usa la llamada directa a Anthropic, que
+// solo funciona dentro del chat de Claude (no en quality-sendemail.connectlabs.tech).
+const GENERATE_EMAIL_ENDPOINT = '';
+
 async function generar(){
   const btn = document.getElementById('gen-btn');
   const label = document.getElementById('gen-label');
@@ -924,34 +929,53 @@ async function generar(){
 
   try{
     const promptText = buildPrompt();
-    let userContent;
-    if(heliosBase64){
-      userContent = [
-        {type:'image', source:{type:'base64', media_type: heliosMime || 'image/png', data: heliosBase64}},
-        {type:'text', text: promptText}
-      ];
+    let full;
+
+    if (GENERATE_EMAIL_ENDPOINT) {
+      // Producción: la Azure Function guarda la API key y arma el correo.
+      const response = await fetch(GENERATE_EMAIL_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          promptText,
+          heliosBase64: heliosBase64 || undefined,
+          heliosMime: heliosMime || undefined,
+        }),
+      });
+      if(!response.ok){ throw new Error('La función de generación respondió con error ' + response.status); }
+      const data = await response.json();
+      full = (data.text || '').trim();
+
     } else {
-      userContent = promptText;
+      // Fallback: llamada directa a Anthropic — solo funciona dentro del chat de Claude.
+      let userContent;
+      if(heliosBase64){
+        userContent = [
+          {type:'image', source:{type:'base64', media_type: heliosMime || 'image/png', data: heliosBase64}},
+          {type:'text', text: promptText}
+        ];
+      } else {
+        userContent = promptText;
+      }
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userContent }]
+        })
+      });
+
+      if(!response.ok){ throw new Error('La API respondió con error ' + response.status); }
+      const data = await response.json();
+      const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
+      full = textBlocks.join('\n').trim();
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }]
-      })
-    });
-
-    if(!response.ok){ throw new Error('La API respondió con error ' + response.status); }
-
-    const data = await response.json();
-    const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
-    const full = textBlocks.join('\n').trim();
     if(!full) throw new Error('No se recibió contenido del modelo.');
-
     renderOutput(full);
 
   } catch(err){
