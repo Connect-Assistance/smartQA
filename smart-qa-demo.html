@@ -207,6 +207,14 @@
   .empty-state p{font-size:13px;max-width:250px;line-height:1.5;margin:0;}
 
   .semaforo-line{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#FAFBFD;}
+  .view-toggle{display:flex;gap:4px;margin-left:auto;}
+  .vt{border:1px solid var(--border);background:#fff;color:var(--text-600);font-family:'Roboto',sans-serif;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:16px;cursor:pointer;}
+  .vt:hover{border-color:var(--accent);}
+  .vt.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  #email-preview-frame{width:100%;height:460px;border:none;display:block;background:#F5F6FA;}
+  #edit-wrap{padding:16px 20px;}
+  #email-edit-textarea{width:100%;min-height:420px;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'Roboto',sans-serif;font-size:13px;line-height:1.6;color:var(--text-900);resize:vertical;}
+  #email-edit-textarea:focus{outline:none;border-color:var(--accent);}
   .semaforo-reason{font-size:12px;color:var(--text-600);}
   .email-subject{padding:12px 22px 0;font-size:13px;color:var(--text-900);}
   .email-body{padding:22px;white-space:pre-wrap;font-size:13.5px;line-height:1.65;max-height:480px;overflow-y:auto;}
@@ -536,6 +544,8 @@ let heliosBase64 = null;
 let heliosMime = null;
 let lastEmailText = "";
 let lastEmailSubject = "";
+let lastAlerta = "AMARILLO";
+let lastAlertaRazon = "";
 
 const titles = {
   overview: ['Overview', 'Impacto del sistema de trazabilidad de calidad con IA en el equipo de Calidad y Formación Regional.'],
@@ -894,6 +904,70 @@ ${hallazgosAdicionales ? 'Hallazgos adicionales aportados por el analista (incor
 ${heliosBase64 ? 'Se adjunta una captura de pantalla de Helios como evidencia del caso. Incorporá lo que se observe en la imagen dentro de la descripción del caso, en una sección breve llamada "Evidencia Helios".' : ''}`;
 }
 
+// Misma plantilla que azure-function/templates/correo-trazabilidad.html —
+// si se edita una, hay que editar la otra para que la vista previa coincida
+// con lo que realmente se envía.
+const EMAIL_TEMPLATE_HTML = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>{{ASUNTO}}</title></head>
+<body style="margin:0; padding:0; background-color:#F5F6FA; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6FA; padding:24px 0;">
+  <tr><td align="center">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:10px; overflow:hidden; border:1px solid #E3E6EE;">
+      <tr><td style="background-color:#0C1A3C; padding:20px 28px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="font-family:Arial, Helvetica, sans-serif; color:#B9C4DC; font-size:12px; font-weight:bold; letter-spacing:1px;">CONNECT ASISTENCIAS</td></tr>
+          <tr><td style="font-family:Arial, Helvetica, sans-serif; color:#FFFFFF; font-size:18px; font-weight:bold; padding-top:2px;">SMART QA — Trazabilidad de calidad</td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:20px 28px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="background-color:{{SEMAFORO_BG}}; color:{{SEMAFORO_FG}}; font-family:Arial, Helvetica, sans-serif; font-size:12px; font-weight:bold; padding:6px 14px; border-radius:20px;">{{SEMAFORO_LABEL}}</td>
+          <td style="font-family:Arial, Helvetica, sans-serif; color:#5B647A; font-size:12px; padding-left:10px;">{{SEMAFORO_RAZON}}</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:20px 28px 8px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.6; color:#151E33;">
+        {{CUERPO_HTML}}
+      </td></tr>
+      <tr><td style="padding:20px 28px 26px;">
+        <hr style="border:none; border-top:1px solid #E3E6EE; margin:0 0 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8890A0;">Este correo fue generado con SMART QA · Connect Asistencias Extraordinarias</td>
+        </tr></table>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+
+const SEMAFORO_COLORS_JS = {
+  VERDE:    { bg: '#E4F5EC', fg: '#1E8E5A', label: 'Verde' },
+  AMARILLO: { bg: '#FDF1DD', fg: '#B9720C', label: 'Amarillo' },
+  ROJO:     { bg: '#FBE7E2', fg: '#C5432A', label: 'Rojo' },
+};
+
+function escapeHtmlEmail(str){
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function plainTextToHtmlEmail(text){
+  return String(text).split(/\n\s*\n/).map(p =>
+    `<p style="margin:0 0 14px;">${escapeHtmlEmail(p).replace(/\n/g,'<br>')}</p>`
+  ).join('\n');
+}
+
+function buildEmailPreviewHtml({asunto, alerta, alerta_razon, cuerpo}){
+  const sem = SEMAFORO_COLORS_JS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS_JS.AMARILLO;
+  return EMAIL_TEMPLATE_HTML
+    .replaceAll('{{ASUNTO}}', escapeHtmlEmail(asunto || ''))
+    .replaceAll('{{SEMAFORO_BG}}', sem.bg)
+    .replaceAll('{{SEMAFORO_FG}}', sem.fg)
+    .replaceAll('{{SEMAFORO_LABEL}}', sem.label)
+    .replaceAll('{{SEMAFORO_RAZON}}', escapeHtmlEmail(alerta_razon || ''))
+    .replaceAll('{{CUERPO_HTML}}', plainTextToHtmlEmail(cuerpo || ''));
+}
+
 const SYSTEM_PROMPT = `Sos analista de calidad senior de Connect Asistencias Extraordinarias. Código corporativo: AYUDAMOS PERSONAS.
 Redactá un correo de trazabilidad de calidad en español: profesional pero cercano, claro y directo, como lo escribiría una persona experta hablando con un colega.
 
@@ -1011,14 +1085,25 @@ function renderOutput(parsed){
 
   lastEmailText = body;
   lastEmailSubject = parsed.asunto || '';
+  lastAlerta = alerta;
+  lastAlertaRazon = semReason;
 
   document.getElementById('output-area').innerHTML = `
     <div class="semaforo-line">
       <span class="pill ${semColor}">${semColor.charAt(0).toUpperCase()+semColor.slice(1)}</span>
       <span class="semaforo-reason">${esc(semReason)}</span>
+      <div class="view-toggle">
+        <button class="vt active" id="vt-preview" onclick="setEmailView('preview')">Vista previa</button>
+        <button class="vt" id="vt-edit" onclick="setEmailView('edit')">Editar</button>
+      </div>
     </div>
     ${lastEmailSubject ? `<div class="email-subject"><strong>Asunto:</strong> ${esc(lastEmailSubject)}</div>` : ''}
-    <div class="email-body" id="email-body-text">${esc(body)}</div>
+    <div id="preview-wrap">
+      <iframe id="email-preview-frame" title="Vista previa del correo" srcdoc="${escAttr(buildEmailPreviewHtml({asunto:lastEmailSubject, alerta:lastAlerta, alerta_razon:lastAlertaRazon, cuerpo:lastEmailText}))}"></iframe>
+    </div>
+    <div id="edit-wrap" style="display:none">
+      <textarea id="email-edit-textarea" oninput="onEditEmail()">${esc(lastEmailText)}</textarea>
+    </div>
     <div class="actions-row">
       <button class="outline-btn" onclick="copiarTexto()">
         <svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
@@ -1038,6 +1123,32 @@ function renderOutput(parsed){
     <div id="send-status"></div>
   `;
 }
+
+function escAttr(str){
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
+
+function setEmailView(mode){
+  document.getElementById('preview-wrap').style.display = mode === 'preview' ? 'block' : 'none';
+  document.getElementById('edit-wrap').style.display = mode === 'edit' ? 'block' : 'none';
+  document.getElementById('vt-preview').classList.toggle('active', mode === 'preview');
+  document.getElementById('vt-edit').classList.toggle('active', mode === 'edit');
+  if(mode === 'preview'){
+    refreshPreviewFrame();
+  }
+}
+
+function onEditEmail(){
+  lastEmailText = document.getElementById('email-edit-textarea').value;
+}
+
+function refreshPreviewFrame(){
+  const frame = document.getElementById('email-preview-frame');
+  if(frame){
+    frame.srcdoc = buildEmailPreviewHtml({asunto:lastEmailSubject, alerta:lastAlerta, alerta_razon:lastAlertaRazon, cuerpo:lastEmailText});
+  }
+}
+
 
 function copiarTexto(){ navigator.clipboard.writeText(lastEmailText); }
 
