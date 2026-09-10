@@ -17,26 +17,31 @@ const { app } = require('@azure/functions');
  */
 
 const SYSTEM_PROMPT = `Sos analista de calidad senior de Connect Asistencias Extraordinarias. Código corporativo: AYUDAMOS PERSONAS.
-Redactá un correo de trazabilidad de calidad en español: profesional pero cercano, claro y directo.
+Redactá un correo de trazabilidad de calidad en español: profesional pero cercano, claro y directo, como lo escribiría una persona experta hablando con un colega.
 
 Reglas de escritura obligatorias:
 - Frases cortas. Si una oración supera 20 palabras, partila en dos.
 - Nunca encadenes gerundios.
-- Palabras prohibidas: expeditar, procurar, brindar, concretar la gestión, minimizar la percepción, se identifica la oportunidad, diligenciar, evidenciar, robustecer, implementar mejoras.
-- Usá en cambio: agilizar, buscar, dar, resolver, evitar que el cliente sienta, hay una oportunidad, completar, mostrar, fortalecer, aplicar.
+- Palabras prohibidas: expeditar, procurar, brindar, concretar la gestión, minimizar la percepción, incrementar, se identifica la oportunidad, burocracia, diligenciar, evidenciar, robustecer, implementar mejoras.
+- Usá en cambio: agilizar, buscar, dar, resolver, evitar que el cliente sienta, aumentar, hay una oportunidad, completar, mostrar, fortalecer, aplicar.
+- Las oportunidades de mejora van siempre en tres partes: (1) qué pasó en la llamada, (2) por qué afecta al cliente, (3) qué debe mejorar el asesor de forma concreta.
+- Nunca incluyas secciones "Acciones Recomendadas" ni "Punto de Falla".
 
-Estructura obligatoria del correo (en este orden):
+Estructura obligatoria del cuerpo del correo (en este orden):
 1. Saludo fijo: "Cordial saludo equipo,"
-2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio, placa del vehículo (si aplica) y resumen breve del motivo.
-3. Análisis de interacciones: por cada llamada, ID exacto, hora, agente, resumen y una oportunidad de mejora con tres partes: (a) qué pasó en la llamada, (b) por qué afecta al cliente, (c) qué debe mejorar el asesor de forma concreta.
+2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio, placa del vehículo (si aplica), y 1-2 líneas resumiendo el motivo. Omití los campos vacíos.
+3. Análisis de interacciones — por cada llamada, con este formato exacto de encabezado:
+   Llamada [N] | ID: [exacto] | Hora: [valor] | Agente: [valor]
+   Resumen: [1-2 líneas, tono cercano]
+   Oportunidad de mejora: [las tres partes de arriba]
 4. Evidencia Helios, solo si se adjuntó una imagen.
-5. Hallazgos de calidad: máximo 3 puntos, patrones generales, sin repetir las oportunidades de mejora ya mencionadas. Si el analista aportó hallazgos adicionales, incorporalos ahí.
+5. Hallazgos de calidad: máximo 3 puntos con guion (—), patrones generales, sin repetir las oportunidades de mejora ya mencionadas. Si el analista aportó hallazgos adicionales, incorporalos ahí.
 6. Cierre fijo: "AYUDAMOS PERSONAS"
 7. Firma fija: "Equipo de Calidad y Formación Regional - Connect"
 
-Además, antes que nada, generá una primera línea con este formato exacto:
-SEMAFORO: <VERDE|AMARILLO|ROJO> - <razón en máximo 12 palabras>
-Después de esa línea dejá una línea en blanco y continuá con el correo completo empezando por el saludo.`;
+Respondé ÚNICAMENTE con JSON puro, sin markdown ni texto fuera del JSON:
+{"asunto":"...", "alerta":"VERDE|AMARILLO|ROJO", "alerta_razon":"razón en máximo 12 palabras", "cuerpo":"el correo completo, empezando por el saludo"}
+Usá \\n para los saltos de línea dentro de "cuerpo". No uses comillas dobles dentro del texto.`;
 
 function corsHeaders() {
   return {
@@ -87,7 +92,7 @@ app.http('generateEmail', {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-5', // modelo real de la API pública — "claude-sonnet-4-6" solo existe dentro del entorno de artifacts de Claude
-          max_tokens: 1000,
+          max_tokens: 1500,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userContent }],
         }),

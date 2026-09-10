@@ -208,6 +208,7 @@
 
   .semaforo-line{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#FAFBFD;}
   .semaforo-reason{font-size:12px;color:var(--text-600);}
+  .email-subject{padding:12px 22px 0;font-size:13px;color:var(--text-900);}
   .email-body{padding:22px;white-space:pre-wrap;font-size:13.5px;line-height:1.65;max-height:480px;overflow-y:auto;}
   .actions-row{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);}
   .outline-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-family:'Roboto',sans-serif;font-weight:600;font-size:12.5px;color:var(--text-900);cursor:pointer;}
@@ -534,6 +535,7 @@ let callSeq = 0;
 let heliosBase64 = null;
 let heliosMime = null;
 let lastEmailText = "";
+let lastEmailSubject = "";
 
 const titles = {
   overview: ['Overview', 'Impacto del sistema de trazabilidad de calidad con IA en el equipo de Calidad y Formación Regional.'],
@@ -893,26 +895,40 @@ ${heliosBase64 ? 'Se adjunta una captura de pantalla de Helios como evidencia de
 }
 
 const SYSTEM_PROMPT = `Sos analista de calidad senior de Connect Asistencias Extraordinarias. Código corporativo: AYUDAMOS PERSONAS.
-Redactá un correo de trazabilidad de calidad en español: profesional pero cercano, claro y directo.
+Redactá un correo de trazabilidad de calidad en español: profesional pero cercano, claro y directo, como lo escribiría una persona experta hablando con un colega.
 
 Reglas de escritura obligatorias:
 - Frases cortas. Si una oración supera 20 palabras, partila en dos.
 - Nunca encadenes gerundios.
-- Palabras prohibidas: expeditar, procurar, brindar, concretar la gestión, minimizar la percepción, se identifica la oportunidad, diligenciar, evidenciar, robustecer, implementar mejoras.
-- Usá en cambio: agilizar, buscar, dar, resolver, evitar que el cliente sienta, hay una oportunidad, completar, mostrar, fortalecer, aplicar.
+- Palabras prohibidas: expeditar, procurar, brindar, concretar la gestión, minimizar la percepción, incrementar, se identifica la oportunidad, burocracia, diligenciar, evidenciar, robustecer, implementar mejoras.
+- Usá en cambio: agilizar, buscar, dar, resolver, evitar que el cliente sienta, aumentar, hay una oportunidad, completar, mostrar, fortalecer, aplicar.
+- Las oportunidades de mejora van siempre en tres partes: (1) qué pasó en la llamada, (2) por qué afecta al cliente, (3) qué debe mejorar el asesor de forma concreta.
+- Nunca incluyas secciones "Acciones Recomendadas" ni "Punto de Falla".
 
-Estructura obligatoria del correo (en este orden):
+Estructura obligatoria del cuerpo del correo (en este orden):
 1. Saludo fijo: "Cordial saludo equipo,"
-2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio, placa del vehículo (si aplica) y resumen breve del motivo.
-3. Análisis de interacciones: por cada llamada, ID exacto, hora, agente, resumen y una oportunidad de mejora con tres partes: (a) qué pasó en la llamada, (b) por qué afecta al cliente, (c) qué debe mejorar el asesor de forma concreta.
+2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio, placa del vehículo (si aplica), y 1-2 líneas resumiendo el motivo. Omití los campos vacíos.
+3. Análisis de interacciones — por cada llamada, con este formato exacto de encabezado:
+   Llamada [N] | ID: [exacto] | Hora: [valor] | Agente: [valor]
+   Resumen: [1-2 líneas, tono cercano]
+   Oportunidad de mejora: [las tres partes de arriba]
 4. Evidencia Helios, solo si se adjuntó una imagen.
-5. Hallazgos de calidad: máximo 3 puntos, patrones generales, sin repetir las oportunidades de mejora ya mencionadas. Si el analista aportó hallazgos adicionales, incorporalos ahí.
+5. Hallazgos de calidad: máximo 3 puntos con guion (—), patrones generales, sin repetir las oportunidades de mejora ya mencionadas. Si el analista aportó hallazgos adicionales, incorporalos ahí.
 6. Cierre fijo: "AYUDAMOS PERSONAS"
 7. Firma fija: "Equipo de Calidad y Formación Regional - Connect"
 
-Además, antes que nada, generá una primera línea con este formato exacto:
-SEMAFORO: <VERDE|AMARILLO|ROJO> - <razón en máximo 12 palabras>
-Después de esa línea dejá una línea en blanco y continuá con el correo completo empezando por el saludo.`;
+Respondé ÚNICAMENTE con JSON puro, sin markdown ni texto fuera del JSON:
+{"asunto":"...", "alerta":"VERDE|AMARILLO|ROJO", "alerta_razon":"razón en máximo 12 palabras", "cuerpo":"el correo completo, empezando por el saludo"}
+Usá \\n para los saltos de línea dentro de "cuerpo". No uses comillas dobles dentro del texto.`;
+
+function parseModelResponse(raw){
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const match = clean.match(/\{[\s\S]*\}/);
+  if(!match) throw new Error('El modelo no devolvió el JSON esperado.');
+  const parsed = JSON.parse(match[0]);
+  if(!parsed.cuerpo) throw new Error('La respuesta no incluye el cuerpo del correo.');
+  return parsed;
+}
 
 // Cuando tengas la Azure Function de generación deployada, pegá acá su URL
 // completa (con ?code=...). Vacío = usa la llamada directa a Anthropic, que
@@ -976,7 +992,8 @@ async function generar(){
     }
 
     if(!full) throw new Error('No se recibió contenido del modelo.');
-    renderOutput(full);
+    const parsed = parseModelResponse(full);
+    renderOutput(parsed);
 
   } catch(err){
     errorSlot.innerHTML = `<div class="error-box">No se pudo generar el correo: ${esc(err.message)}</div>`;
@@ -986,30 +1003,21 @@ async function generar(){
   }
 }
 
-function renderOutput(full){
-  const lines = full.split('\n');
-  let semColor = 'amarillo', semReason = '';
-  let bodyStart = 0;
+function renderOutput(parsed){
+  const alerta = (parsed.alerta || 'AMARILLO').toUpperCase();
+  const semColor = alerta === 'ROJO' ? 'rojo' : alerta === 'VERDE' ? 'verde' : 'amarillo';
+  const semReason = parsed.alerta_razon || '';
+  const body = (parsed.cuerpo || '').trim();
 
-  if(lines[0] && lines[0].toUpperCase().startsWith('SEMAFORO')){
-    const line = lines[0];
-    if(/ROJO/i.test(line)) semColor='rojo';
-    else if(/VERDE/i.test(line)) semColor='verde';
-    else semColor='amarillo';
-    const dash = line.indexOf('-');
-    semReason = dash>-1 ? line.slice(dash+1).trim() : '';
-    bodyStart = 1;
-    while(lines[bodyStart] === '') bodyStart++;
-  }
-
-  const body = lines.slice(bodyStart).join('\n').trim();
   lastEmailText = body;
+  lastEmailSubject = parsed.asunto || '';
 
   document.getElementById('output-area').innerHTML = `
     <div class="semaforo-line">
       <span class="pill ${semColor}">${semColor.charAt(0).toUpperCase()+semColor.slice(1)}</span>
       <span class="semaforo-reason">${esc(semReason)}</span>
     </div>
+    ${lastEmailSubject ? `<div class="email-subject"><strong>Asunto:</strong> ${esc(lastEmailSubject)}</div>` : ''}
     <div class="email-body" id="email-body-text">${esc(body)}</div>
     <div class="actions-row">
       <button class="outline-btn" onclick="copiarTexto()">
@@ -1037,7 +1045,7 @@ function abrirGmail(){
   const to = encodeURIComponent(document.getElementById('f-dirigido').value || '');
   const po = document.getElementById('f-po').value;
   const operador = document.getElementById('f-operador').value;
-  const subject = encodeURIComponent(`Trazabilidad de calidad – Caso ${po} – ${operador}`);
+  const subject = encodeURIComponent(lastEmailSubject || `Trazabilidad de calidad – Caso ${po} – ${operador}`);
   const body = encodeURIComponent(lastEmailText);
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank');
 }
