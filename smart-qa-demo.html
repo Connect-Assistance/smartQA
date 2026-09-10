@@ -869,39 +869,21 @@ function renderMetricas(){
   document.getElementById('met-horas').textContent = (horas || 264) + 'h';
 }
 
-function buildPrompt(){
-  const pais = document.getElementById('f-pais').value;
-  const operador = document.getElementById('f-operador').value;
-  const po = document.getElementById('f-po').value;
-  const fecha = document.getElementById('f-fecha').value || 'No especificada';
-  const cliente = document.getElementById('f-cliente').value;
-  const tipo = document.getElementById('f-tipo').value;
-  const placa = document.getElementById('f-placa').value || 'N/A';
-  const dirigido = document.getElementById('f-dirigido').value;
-  const motivo = document.getElementById('f-motivo').value;
-  const hallazgosAdicionales = document.getElementById('f-hallazgos').value;
-
-  let llamadasTxt = '';
-  calls.forEach((c,i)=>{
-    llamadasTxt += `\n--- Llamada ${i+1} ---\nID: ${c.callId||'No especificado'}\nHora: ${c.hora||'No especificada'}\nAgente: ${c.agente||'No especificado'}\nResumen: ${c.resumen||'Sin resumen'}\n`;
-  });
-
-  return `Caso a analizar:
-PO / Caso: ${po}
-País: ${pais}
-Aseguradora / Cuenta: ${operador}
-Fecha del evento: ${fecha}
-Cliente: ${cliente}
-Tipo de servicio: ${tipo}
-Placa del vehículo: ${placa}
-Dirigido a: ${dirigido}
-Motivo del caso: ${motivo}
-
-Llamadas analizadas:${llamadasTxt || '\nNo se registraron llamadas.'}
-
-${hallazgosAdicionales ? 'Hallazgos adicionales aportados por el analista (incorporalos en la sección de Hallazgos de calidad, junto a los que salgan del análisis de llamadas, respetando el máximo de 3 puntos):\n' + hallazgosAdicionales : ''}
-
-${heliosBase64 ? 'Se adjunta una captura de pantalla de Helios como evidencia del caso. Incorporá lo que se observe en la imagen dentro de la descripción del caso, en una sección breve llamada "Evidencia Helios".' : ''}`;
+function collectCaseData(){
+  return {
+    pais: document.getElementById('f-pais').value,
+    operador: document.getElementById('f-operador').value,
+    po: document.getElementById('f-po').value,
+    fecha: document.getElementById('f-fecha').value || 'No especificada',
+    cliente: document.getElementById('f-cliente').value,
+    tipo: document.getElementById('f-tipo').value,
+    placa: document.getElementById('f-placa').value || 'N/A',
+    dirigido: document.getElementById('f-dirigido').value,
+    motivo: document.getElementById('f-motivo').value,
+    hallazgosAdicionales: document.getElementById('f-hallazgos').value,
+    tieneEvidencia: !!heliosBase64,
+    calls: calls.map(c => ({ callId: c.callId, hora: c.hora, agente: c.agente, resumen: c.resumen }))
+  };
 }
 
 // Misma plantilla que azure-function/templates/correo-trazabilidad.html —
@@ -968,46 +950,106 @@ function buildEmailPreviewHtml({asunto, alerta, alerta_razon, cuerpo}){
     .replaceAll('{{CUERPO_HTML}}', plainTextToHtmlEmail(cuerpo || ''));
 }
 
-const SYSTEM_PROMPT = `Sos analista de calidad senior de Connect Asistencias Extraordinarias. Código corporativo: AYUDAMOS PERSONAS.
-Redactá un correo de trazabilidad de calidad en español: profesional pero cercano, claro y directo, como lo escribiría una persona experta hablando con un colega.
+/* --- Generación local del correo (sin API, sin key) ---
+   Reglas de tono tomadas del brief: frases cortas, sin gerundios encadenados,
+   sin las palabras prohibidas, oportunidad de mejora en 3 partes, hallazgos
+   con guion, y las secciones fijas de saludo/cierre/firma. */
 
-Reglas de escritura obligatorias:
-- Frases cortas. Si una oración supera 20 palabras, partila en dos.
-- Nunca encadenes gerundios.
-- Palabras prohibidas: expeditar, procurar, brindar, concretar la gestión, minimizar la percepción, incrementar, se identifica la oportunidad, burocracia, diligenciar, evidenciar, robustecer, implementar mejoras.
-- Usá en cambio: agilizar, buscar, dar, resolver, evitar que el cliente sienta, aumentar, hay una oportunidad, completar, mostrar, fortalecer, aplicar.
-- Las oportunidades de mejora van siempre en tres partes: (1) qué pasó en la llamada, (2) por qué afecta al cliente, (3) qué debe mejorar el asesor de forma concreta.
-- Nunca incluyas secciones "Acciones Recomendadas" ni "Punto de Falla".
+const PALABRAS_PROHIBIDAS_A_REEMPLAZO = [
+  [/\bexpeditar\b/gi, 'agilizar'],
+  [/\bprocurar\b/gi, 'buscar'],
+  [/\bbrindar\b/gi, 'dar'],
+  [/\bconcretar la gesti[oó]n\b/gi, 'resolver'],
+  [/\bminimizar la percepci[oó]n\b/gi, 'evitar que el cliente sienta'],
+  [/\bincrementar\b/gi, 'aumentar'],
+  [/\bse identifica la oportunidad\b/gi, 'hay una oportunidad'],
+  [/\bburocracia\b/gi, 'trámites'],
+  [/\bdiligenciar\b/gi, 'completar'],
+  [/\bevidenciar\b/gi, 'mostrar'],
+  [/\brobustecer\b/gi, 'fortalecer'],
+  [/\bimplementar mejoras\b/gi, 'aplicar mejoras'],
+];
 
-Estructura obligatoria del cuerpo del correo (en este orden):
-1. Saludo fijo: "Cordial saludo equipo,"
-2. Descripción del caso: PO, cliente, fecha del evento, país, aseguradora/cuenta, tipo de servicio, placa del vehículo (si aplica), y 1-2 líneas resumiendo el motivo. Omití los campos vacíos.
-3. Análisis de interacciones — por cada llamada, con este formato exacto de encabezado:
-   Llamada [N] | ID: [exacto] | Hora: [valor] | Agente: [valor]
-   Resumen: [1-2 líneas, tono cercano]
-   Oportunidad de mejora: [las tres partes de arriba]
-4. Evidencia Helios, solo si se adjuntó una imagen.
-5. Hallazgos de calidad: máximo 3 puntos con guion (—), patrones generales, sin repetir las oportunidades de mejora ya mencionadas. Si el analista aportó hallazgos adicionales, incorporalos ahí.
-6. Cierre fijo: "AYUDAMOS PERSONAS"
-7. Firma fija: "Equipo de Calidad y Formación Regional - Connect"
-
-Respondé ÚNICAMENTE con JSON puro, sin markdown ni texto fuera del JSON:
-{"asunto":"...", "alerta":"VERDE|AMARILLO|ROJO", "alerta_razon":"razón en máximo 12 palabras", "cuerpo":"el correo completo, empezando por el saludo"}
-Usá \\n para los saltos de línea dentro de "cuerpo". No uses comillas dobles dentro del texto.`;
-
-function parseModelResponse(raw){
-  const clean = raw.replace(/```json|```/g, '').trim();
-  const match = clean.match(/\{[\s\S]*\}/);
-  if(!match) throw new Error('El modelo no devolvió el JSON esperado.');
-  const parsed = JSON.parse(match[0]);
-  if(!parsed.cuerpo) throw new Error('La respuesta no incluye el cuerpo del correo.');
-  return parsed;
+function limpiarTono(texto){
+  let t = texto || '';
+  PALABRAS_PROHIBIDAS_A_REEMPLAZO.forEach(([patron, reemplazo]) => { t = t.replace(patron, reemplazo); });
+  return t;
 }
 
-// Cuando tengas la Azure Function de generación deployada, pegá acá su URL
-// completa (con ?code=...). Vacío = usa la llamada directa a Anthropic, que
-// solo funciona dentro del chat de Claude (no en quality-sendemail.connectlabs.tech).
-const GENERATE_EMAIL_ENDPOINT = '';
+// Patrones conocidos -> oportunidad de mejora ya armada en 3 partes.
+const PATRONES_OPORTUNIDAD = [
+  { test: /no (valid[oa]|confirm[oa]).{0,20}disponibilidad/i,
+    texto: 'El agente no valida la disponibilidad real con el operador antes de confirmar. Esto hace que el cliente confíe en un horario que después no se cumple. El asesor debe verificar con el operador antes de dar una hora al cliente.' },
+  { test: /nadie lleg|no lleg[oó]/i,
+    texto: 'El servicio no se cumple en el horario acordado. Esto hace que el cliente pierda tiempo esperando sin resultado. El asesor debe confirmar la llegada del técnico antes de cerrar la cita.' },
+  { test: /sin (ofrecer )?compensaci[oó]n/i,
+    texto: 'El agente no ofrece ninguna compensación tras el inconveniente. Esto puede hacer que el cliente sienta que el problema no importa. El asesor debe ofrecer una alternativa concreta, como una franja prioritaria.' },
+  { test: /sin seguimiento|no.{0,15}document/i,
+    texto: 'El caso no queda documentado con el detalle necesario. Esto dificulta el seguimiento si el cliente vuelve a llamar. El asesor debe registrar cada paso del caso en el sistema.' },
+  { test: /demora|espera/i,
+    texto: 'La respuesta al cliente tarda más de lo esperado. Esto aumenta la frustración del cliente con el servicio. El asesor debe agilizar la gestión desde el primer contacto.' },
+  { test: /no contesta|no responde/i,
+    texto: 'El cliente no recibe respuesta en el canal esperado. Esto lo obliga a volver a llamar por lo mismo. El asesor debe confirmar que el cliente recibió la información antes de cerrar el contacto.' },
+];
+
+function analizarLlamada(resumen){
+  const encontrado = PATRONES_OPORTUNIDAD.find(p => p.test.test(resumen || ''));
+  if(encontrado) return encontrado.texto;
+  return 'Hay una oportunidad de mejora en la claridad de la información dada al cliente. Esto puede generar dudas sobre el estado real del caso. El asesor debe confirmar cada dato antes de comunicarlo.';
+}
+
+const PALABRAS_CLAVE_ALERTA = ['no llegó','nadie llegó','no valida','no confirma','sin compensación','sin seguimiento','no contesta','no responde','demora','reclamo','queja','no resuelve','sin respuesta','incumpl'];
+
+function calcularSemaforo(d){
+  const texto = [d.motivo, d.hallazgosAdicionales, ...d.calls.map(c => c.resumen)].join(' ').toLowerCase();
+  const coincidencias = PALABRAS_CLAVE_ALERTA.filter(k => texto.includes(k));
+  if(coincidencias.length >= 3) return { alerta:'ROJO', alerta_razon:'Varios patrones de incumplimiento detectados en las llamadas.' };
+  if(coincidencias.length >= 1) return { alerta:'AMARILLO', alerta_razon:'Se detectan oportunidades de mejora puntuales en el servicio.' };
+  return { alerta:'VERDE', alerta_razon:'No se detectan patrones de incumplimiento en las llamadas registradas.' };
+}
+
+function generarCorreoLocal(d){
+  const lineas = [];
+  lineas.push('Cordial saludo equipo,');
+  lineas.push('');
+
+  let desc = `Este es el caso PO ${d.po || 'N/E'}, del cliente ${d.cliente || 'N/E'}, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}.`;
+  if(d.placa && d.placa.trim().toUpperCase() !== 'N/A' && d.placa.trim() !== '') desc += ` Placa: ${d.placa}.`;
+  if(d.motivo) desc += ` ${limpiarTono(d.motivo)}`;
+  lineas.push(desc);
+  lineas.push('');
+
+  if(d.tieneEvidencia){
+    lineas.push('Evidencia Helios: se adjunta captura de pantalla como respaldo del caso.');
+    lineas.push('');
+  }
+
+  const hallazgosDeLlamadas = [];
+  d.calls.forEach((c, i) => {
+    const oportunidad = analizarLlamada(c.resumen);
+    if(!hallazgosDeLlamadas.includes(oportunidad)) hallazgosDeLlamadas.push(oportunidad);
+    lineas.push(`Llamada ${i+1} | ID: ${c.callId || 'No especificado'} | Hora: ${c.hora || 'No especificada'} | Agente: ${c.agente || 'No especificado'}`);
+    lineas.push(`Resumen: ${limpiarTono(c.resumen) || 'Sin resumen registrado.'}`);
+    lineas.push(`Oportunidad de mejora: ${oportunidad}`);
+    lineas.push('');
+  });
+
+  lineas.push('Hallazgos de calidad:');
+  const hallazgosFinal = [];
+  if(d.hallazgosAdicionales) hallazgosFinal.push(limpiarTono(d.hallazgosAdicionales));
+  hallazgosDeLlamadas.forEach(h => { if(hallazgosFinal.length < 3 && !hallazgosFinal.includes(h)) hallazgosFinal.push(h); });
+  if(hallazgosFinal.length === 0) hallazgosFinal.push('No se identifican patrones adicionales fuera de lo ya mencionado en las llamadas.');
+  hallazgosFinal.slice(0, 3).forEach(h => lineas.push(`— ${h}`));
+  lineas.push('');
+  lineas.push('AYUDAMOS PERSONAS');
+  lineas.push('');
+  lineas.push('Equipo de Calidad y Formación Regional - Connect');
+
+  const { alerta, alerta_razon } = calcularSemaforo(d);
+  const asunto = `Trazabilidad de calidad – Caso ${d.po || ''} – ${d.operador || ''}`;
+
+  return { asunto, alerta, alerta_razon, cuerpo: lineas.join('\n') };
+}
 
 async function generar(){
   const btn = document.getElementById('gen-btn');
@@ -1018,55 +1060,10 @@ async function generar(){
   label.innerHTML = '<span class="spin"></span> Generando…';
 
   try{
-    const promptText = buildPrompt();
-    let full;
-
-    if (GENERATE_EMAIL_ENDPOINT) {
-      // Producción: la Azure Function guarda la API key y arma el correo.
-      const response = await fetch(GENERATE_EMAIL_ENDPOINT, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          promptText,
-          heliosBase64: heliosBase64 || undefined,
-          heliosMime: heliosMime || undefined,
-        }),
-      });
-      if(!response.ok){ throw new Error('La función de generación respondió con error ' + response.status); }
-      const data = await response.json();
-      full = (data.text || '').trim();
-
-    } else {
-      // Fallback: llamada directa a Anthropic — solo funciona dentro del chat de Claude.
-      let userContent;
-      if(heliosBase64){
-        userContent = [
-          {type:'image', source:{type:'base64', media_type: heliosMime || 'image/png', data: heliosBase64}},
-          {type:'text', text: promptText}
-        ];
-      } else {
-        userContent = promptText;
-      }
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userContent }]
-        })
-      });
-
-      if(!response.ok){ throw new Error('La API respondió con error ' + response.status); }
-      const data = await response.json();
-      const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
-      full = textBlocks.join('\n').trim();
-    }
-
-    if(!full) throw new Error('No se recibió contenido del modelo.');
-    const parsed = parseModelResponse(full);
+    const data = collectCaseData();
+    // Pequeña espera para que se sienta el paso de "análisis", sin llamar a ninguna API.
+    await new Promise(r => setTimeout(r, 500));
+    const parsed = generarCorreoLocal(data);
     renderOutput(parsed);
 
   } catch(err){
