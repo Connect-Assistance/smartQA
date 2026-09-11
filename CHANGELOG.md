@@ -79,3 +79,9 @@ Versión base del demo, con todo lo construido hasta ahora:
 
 - En Casos, ahora se puede hacer clic en el PO o en el ícono de ojo de cada fila para abrir un modal con el resumen completo del correo (asunto, semáforo y cuerpo, renderizado como HTML) — antes la tabla solo mostraba datos resumidos, sin forma de ver el contenido real del caso.
 - La evidencia Helios no se guarda en la base de datos (solo el texto del caso), así que el modal no la muestra — queda aclarado en el código.
+
+## v0.8.0 — 2026-09-11 (seguridad)
+
+- **Fix de seguridad**: el demo dejó de leer/escribir `smartqa_casos` directo con la anon key de Supabase (quedaba expuesta en el HTML — cualquiera podía leer todos los casos sin loguearse). Ahora pasa por una nueva Azure Function, `casosApi`, que verifica el token de sesión de Firebase antes de tocar la tabla, usando la service role key (secreta) del lado del servidor.
+- SQL en `supabase/lock-casos-table.sql` para sacar las políticas abiertas de la tabla — sin eso, el fix del código no alcanza porque la tabla seguiría aceptando la anon key directo.
+- `guardarCasoEnviado` ahora refresca Overview/Casos/Métricas automáticamente después de guardar, sin esperar a recargar la página.

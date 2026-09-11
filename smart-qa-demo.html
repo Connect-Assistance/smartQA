@@ -353,7 +353,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.7.0</div>
+    <div class="login-version">v0.8.0</div>
   </div>
 </div>
 
@@ -871,17 +871,30 @@ function mapCasoDb(row){
   };
 }
 
+// Ya no se lee smartqa_casos directo con la anon key (quedaba abierto a
+// cualquiera que la copiara del HTML) — pasa por casosApi, que primero
+// verifica la sesión de Firebase del lado del servidor.
+const CASOS_API_ENDPOINT = ''; // pegar acá la URL de la function casosApi cuando esté deployada
+
 async function cargarCasosReales(){
+  if(!CASOS_API_ENDPOINT){
+    console.warn('CASOS_API_ENDPOINT no está configurado — Overview/Casos/Métricas se quedan vacíos hasta que se conecte.');
+    casosReales = [];
+    renderCasosTable();
+    renderOverviewDesdeCasos();
+    renderMetricas();
+    return;
+  }
   try{
-    const { data, error } = await supabaseClient
-      .from('smartqa_casos')
-      .select('*')
-      .order('enviado_at', { ascending: false })
-      .limit(200);
-    if(error) throw error;
+    const idToken = await firebase.auth().currentUser.getIdToken();
+    const response = await fetch(CASOS_API_ENDPOINT, {
+      headers: { 'Authorization': `Bearer ${idToken}` },
+    });
+    if(!response.ok) throw new Error('casosApi respondió ' + response.status);
+    const { data } = await response.json();
     casosReales = (data || []).map(mapCasoDb);
   } catch(err){
-    console.error('No se pudieron cargar los casos reales de smartqa_casos:', err);
+    console.error('No se pudieron cargar los casos reales vía casosApi:', err);
     casosReales = [];
   }
   renderCasosTable();
@@ -1647,24 +1660,38 @@ const MIME_TO_EXT_JS = {'image/png':'png','image/jpeg':'jpg','image/jpg':'jpg','
 
 /* --- Persistencia real de casos (Supabase) — alimenta Overview, Casos y Métricas --- */
 async function guardarCasoEnviado(dirigido){
+  if(!CASOS_API_ENDPOINT){
+    console.warn('CASOS_API_ENDPOINT no está configurado — el caso no queda guardado (el correo sí se mandó).');
+    return;
+  }
   try{
-    await supabaseClient.from('smartqa_casos').insert({
-      po: document.getElementById('f-po').value || null,
-      pais: document.getElementById('f-pais').value || null,
-      cuenta: document.getElementById('f-operador').value || null,
-      tipo_caso: document.getElementById('f-tipo-caso').value || null,
-      tipo_servicio: document.getElementById('f-tipo').value || null,
-      placa: document.getElementById('f-placa').value || null,
-      cliente: document.getElementById('f-cliente').value || null,
-      dirigido: dirigido,
-      asunto: lastEmailSubject || null,
-      alerta: lastAlerta || null,
-      alerta_razon: lastAlertaRazon || null,
-      cuerpo: getCuerpoTextoActual(),
-      enviado_por: CURRENT_USER_EMAIL || null,
+    const idToken = await firebase.auth().currentUser.getIdToken();
+    const response = await fetch(CASOS_API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        po: document.getElementById('f-po').value || null,
+        pais: document.getElementById('f-pais').value || null,
+        cuenta: document.getElementById('f-operador').value || null,
+        tipo_caso: document.getElementById('f-tipo-caso').value || null,
+        tipo_servicio: document.getElementById('f-tipo').value || null,
+        placa: document.getElementById('f-placa').value || null,
+        cliente: document.getElementById('f-cliente').value || null,
+        dirigido: dirigido,
+        asunto: lastEmailSubject || null,
+        alerta: lastAlerta || null,
+        alerta_razon: lastAlertaRazon || null,
+        cuerpo: getCuerpoTextoActual(),
+        // enviado_por lo pone casosApi del lado del servidor, según el token verificado — no confía en lo que mande el navegador.
+      }),
     });
+    if(!response.ok) throw new Error('casosApi respondió ' + response.status);
+    cargarCasosReales(); // refresca Overview/Casos/Métricas con el caso recién guardado
   } catch(err){
-    console.error('No se pudo guardar el caso en smartqa_casos:', err);
+    console.error('No se pudo guardar el caso vía casosApi:', err);
     // No interrumpe el flujo — el correo ya se mandó igual, esto es solo el registro para métricas.
   }
 }

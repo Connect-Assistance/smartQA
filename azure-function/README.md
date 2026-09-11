@@ -1,6 +1,6 @@
-# SMART QA — Azure Function (generación + envío de correo)
+# SMART QA — Azure Function (generación, envío de correo y acceso a casos)
 
-Azure Function (v4, Node 20) con dos endpoints:
+Azure Function (v4, Node 20) con tres endpoints:
 
 - `generateEmail` — genera el correo de trazabilidad llamando a la API de
   Claude (key guardada del lado del servidor).
@@ -11,9 +11,16 @@ Azure Function (v4, Node 20) con dos endpoints:
   MailerSend por debajo). El navegador nunca le pega directo a esa API — le
   pega a `sendEmail`, y `sendEmail` hace la llamada real con el Bearer token
   guardado como variable de entorno acá, nunca expuesto en el navegador.
+- `casosApi` — **reemplaza el acceso directo del navegador a la tabla
+  `smartqa_casos` de Supabase.** Antes el demo leía esa tabla con la anon
+  key, que queda visible en el HTML — cualquiera podía leer todos los casos
+  sin loguearse. Ahora el navegador manda su token de sesión de Firebase,
+  esta función lo verifica, y solo entonces usa la service role key de
+  Supabase (secreta, nunca sale del servidor) para leer o guardar casos.
 
-El demo en GitHub Pages es estático — no puede generar con IA real ni
-mandar correo por sí solo — así que llama a estas dos funciones por `fetch`.
+El demo en GitHub Pages es estático — no puede generar con IA real, mandar
+correo, ni leer/guardar casos de forma segura por sí solo — así que llama
+a estas tres funciones por `fetch`.
 
 ## 1. Conseguir las credenciales
 
@@ -21,6 +28,14 @@ mandar correo por sí solo — así que llama a estas dos funciones por `fetch`.
 - **Bearer token de la Send Mail API** (`API_AUTH_TOKEN` en la documentación
   del PDF), para `sendEmail` — pedirlo a quien administre esa API si no lo
   tenés todavía.
+- **Cuenta de servicio de Firebase**, para `casosApi`: Firebase Console →
+  ⚙️ Configuración del proyecto (`kai-academy-connect`) → Cuentas de
+  servicio → "Generar nueva clave privada". Descarga un archivo `.json` —
+  su contenido completo (como un solo string) va en
+  `FIREBASE_SERVICE_ACCOUNT_JSON`. **Es un secreto real, tratalo como tal.**
+- **Service role key de Supabase**, para `casosApi`: Supabase → el proyecto
+  `dednkgonnirybnpktbzp` → Project Settings → API → "service_role". **No es
+  la anon key — esta sí es secreta**, nunca debe ir al navegador ni al repo.
 
 ## 2. Crear la Function App en Azure
 
@@ -47,6 +62,9 @@ az functionapp config appsettings set \
   --settings \
     ANTHROPIC_API_KEY="<tu-api-key-de-Anthropic>" \
     SEND_MAIL_API_TOKEN="<el-bearer-token-de-la-Send-Mail-API>" \
+    FIREBASE_SERVICE_ACCOUNT_JSON='<contenido-completo-del-json-de-la-cuenta-de-servicio>' \
+    SUPABASE_SERVICE_ROLE_KEY="<la-service-role-key-de-supabase>" \
+    SUPABASE_URL="https://dednkgonnirybnpktbzp.supabase.co" \
     ALLOWED_ORIGIN="https://quality-sendemail.connectlabs.tech"
 ```
 

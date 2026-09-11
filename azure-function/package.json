@@ -1,12 +1,13 @@
 {
   "name": "smartqa-send-email",
   "version": "1.0.0",
-  "description": "Azure Function (v4, Node 20) — genera el correo de trazabilidad y lo envía como puente hacia la Send Mail API real de Connect",
+  "description": "Azure Function (v4, Node 20) — genera el correo de trazabilidad, lo envía como puente hacia la Send Mail API real de Connect, y protege el acceso a los casos guardados",
   "main": "src/functions/*.js",
   "scripts": {
     "start": "func start"
   },
   "dependencies": {
-    "@azure/functions": "^4.5.0"
+    "@azure/functions": "^4.5.0",
+    "firebase-admin": "^12.1.0"
   }
 }
