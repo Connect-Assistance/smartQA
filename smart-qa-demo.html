@@ -260,6 +260,19 @@
   .oe-link{border:none;background:none;color:var(--accent);font-weight:600;font-size:12px;cursor:pointer;padding:2px 4px;}
   .oe-link:hover{text-decoration:underline;}
   .oe-remove{color:var(--red-fg);}
+
+  .cell-clickable{cursor:pointer;color:var(--accent);}
+  .cell-clickable:hover{text-decoration:underline;}
+
+  .modal-backdrop{position:fixed;inset:0;background:rgba(11,18,32,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .modal-card{background:#fff;border-radius:12px;width:600px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+  .modal-head #modal-titulo{font-weight:700;font-size:14.5px;color:var(--text-900);}
+  .modal-close{border:none;background:none;color:var(--text-400);cursor:pointer;padding:4px;}
+  .modal-close:hover{color:var(--text-900);}
+  .modal-close svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;}
+  #modal-body{overflow-y:auto;flex:1;}
+  #modal-body iframe{width:100%;height:60vh;border:none;display:block;}
   .email-body{padding:22px;white-space:pre-wrap;font-size:13.5px;line-height:1.65;max-height:480px;overflow-y:auto;}
   .actions-row{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);}
   .outline-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-family:'Roboto',sans-serif;font-weight:600;font-size:12.5px;color:var(--text-900);cursor:pointer;}
@@ -340,7 +353,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.6.1</div>
+    <div class="login-version">v0.7.0</div>
   </div>
 </div>
 
@@ -567,7 +580,7 @@
 
         <div class="section-card">
           <table>
-            <thead><tr><th>Estado</th><th>Caso</th><th>Aseguradora / Cuenta</th><th>Tipo de servicio</th><th>Fecha</th><th>Dirigido a</th></tr></thead>
+            <thead><tr><th>Estado</th><th>Caso</th><th>Aseguradora / Cuenta</th><th>Tipo de servicio</th><th>Fecha</th><th>Dirigido a</th><th></th></tr></thead>
             <tbody id="casos-tbody"></tbody>
           </table>
         </div>
@@ -643,6 +656,18 @@
       </div>
 
     </main>
+  </div>
+</div>
+
+<div id="caso-modal-backdrop" class="modal-backdrop" style="display:none" onclick="if(event.target===this) cerrarCasoModal()">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div id="modal-titulo">Caso</div>
+      <button class="modal-close" onclick="cerrarCasoModal()">
+        <svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="modal-body"></div>
   </div>
 </div>
 
@@ -829,6 +854,7 @@ function mapCasoDb(row){
   const d = row.enviado_at ? new Date(row.enviado_at) : new Date();
   const fecha = d.toLocaleDateString('es-CR', {day:'2-digit', month:'short', year:'numeric'});
   return {
+    id: row.id,
     estado: (row.alerta || 'amarillo').toLowerCase(),
     po: row.po || '',
     cliente: row.cliente || '',
@@ -838,6 +864,10 @@ function mapCasoDb(row){
     dirigido: row.dirigido || '',
     pais: row.pais || '',
     enviado_at: row.enviado_at,
+    asunto: row.asunto || '',
+    alerta: row.alerta || 'AMARILLO',
+    alerta_razon: row.alerta_razon || '',
+    cuerpo: row.cuerpo || '',
   };
 }
 
@@ -900,6 +930,30 @@ function renderOverviewDesdeCasos(){
 
 let filtroActivo = 'todos';
 
+function verCaso(id){
+  const caso = casosReales.find(c => String(c.id) === String(id));
+  if(!caso) return;
+
+  const labelMap = {verde:'Verde', amarillo:'Amarillo', rojo:'Rojo'};
+  document.getElementById('modal-titulo').textContent = `PO ${caso.po} — ${caso.cliente}`;
+
+  const previewHtml = buildEmailFrame({
+    asunto: caso.asunto,
+    alerta: caso.alerta,
+    alerta_razon: caso.alerta_razon,
+    cuerpoHtml: plainTextToHtmlEmail(caso.cuerpo || ''),
+    evidenciaPreviewHtml: '', // no se guarda la imagen en la base, solo el texto del caso
+  });
+
+  document.getElementById('modal-body').innerHTML = `<iframe title="Resumen del caso" srcdoc="${escAttr(previewHtml)}"></iframe>`;
+  document.getElementById('caso-modal-backdrop').style.display = 'flex';
+}
+
+function cerrarCasoModal(){
+  document.getElementById('caso-modal-backdrop').style.display = 'none';
+  document.getElementById('modal-body').innerHTML = '';
+}
+
 function renderCasosTable(){
   const tbody = document.getElementById('casos-tbody');
   if(!tbody) return;
@@ -913,13 +967,16 @@ function renderCasosTable(){
   tbody.innerHTML = rows.map(c => `
     <tr>
       <td><span class="pill ${c.estado}">${labelMap[c.estado] || c.estado}</span></td>
-      <td><div class="cell-main">PO ${esc(c.po)}</div><div class="cell-sub">${esc(c.cliente)}</div></td>
+      <td><div class="cell-main cell-clickable" onclick="verCaso('${c.id}')">PO ${esc(c.po)}</div><div class="cell-sub">${esc(c.cliente)}</div></td>
       <td>${esc(c.cuenta)}</td>
       <td>${esc(c.tipo)}</td>
       <td>${esc(c.fecha)}</td>
       <td>${esc(c.dirigido)}</td>
+      <td><button class="icon-btn" title="Ver resumen" onclick="verCaso('${c.id}')">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button></td>
     </tr>
-  `).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--text-400);padding:30px;">Todavía no hay casos generados.</td></tr>`;
+  `).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--text-400);padding:30px;">Todavía no hay casos generados.</td></tr>`;
 }
 
 function setFiltro(status, el){

@@ -74,3 +74,8 @@ Versión base del demo, con todo lo construido hasta ahora:
 ## v0.6.1 — 2026-09-11
 
 - El panel de salida ahora tiene su propio control de evidencia ("Adjuntar" / "Cambiar" / "Quitar") — se puede agregar o sacar la captura de Helios directo desde ahí, sin volver al formulario. Es el mismo adjunto en los dos lados: cambiarlo desde el formulario o desde la salida actualiza la vista previa al instante, preservando cualquier edición de texto ya hecha en el cuerpo.
+
+## v0.7.0 — 2026-09-11
+
+- En Casos, ahora se puede hacer clic en el PO o en el ícono de ojo de cada fila para abrir un modal con el resumen completo del correo (asunto, semáforo y cuerpo, renderizado como HTML) — antes la tabla solo mostraba datos resumidos, sin forma de ver el contenido real del caso.
+- La evidencia Helios no se guarda en la base de datos (solo el texto del caso), así que el modal no la muestra — queda aclarado en el código.
