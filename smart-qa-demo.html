@@ -34,11 +34,12 @@
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text-900);font-family:'Roboto',sans-serif;-webkit-font-smoothing:antialiased;}
+  *{-webkit-tap-highlight-color:transparent;}
   .app{display:flex;min-height:100vh;}
 
   /* LOGIN */
-  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
-  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px 36px;width:340px;text-align:center;}
+  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px;}
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px 36px;width:340px;max-width:100%;text-align:center;}
   .login-mark{width:44px;height:44px;border-radius:12px;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
   .login-mark svg{width:22px;height:22px;stroke:#fff;stroke-width:2.6;fill:none;}
   .login-brand{font-family:'Roboto',sans-serif;font-weight:800;font-size:19px;color:var(--text-900);}
@@ -52,6 +53,13 @@
   .login-note{font-size:11.5px;color:var(--text-400);margin-top:18px;}
   #login-error{margin-top:14px;}
   #login-error .error-box{margin:0;}
+
+  /* MOBILE TOPBAR (oculta en desktop) */
+  .mobile-topbar{display:none;align-items:center;gap:14px;padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
+  .hamburger-btn{background:none;border:none;padding:4px;cursor:pointer;color:var(--text-900);}
+  .hamburger-btn svg{width:22px;height:22px;stroke:currentColor;stroke-width:2;fill:none;}
+  .mobile-brand{font-weight:800;font-size:15px;color:var(--text-900);}
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(11,18,32,0.45);z-index:98;}
 
   /* SIDEBAR */
   .sidebar{
@@ -256,6 +264,47 @@
   .placeholder-view svg{width:36px;height:36px;stroke:#C3C9D6;stroke-width:1.5;fill:none;margin-bottom:14px;}
   .placeholder-view h3{font-size:15px;color:var(--text-600);margin:0 0 4px;}
   .placeholder-view p{font-size:12.5px;margin:0;}
+
+  /* RESPONSIVE — tablets y celulares */
+  @media(max-width:880px){
+    .mobile-topbar{display:flex;}
+    .app{position:relative;}
+    .sidebar{
+      position:fixed;top:0;left:0;height:100vh;width:260px;z-index:99;
+      transform:translateX(-100%);transition:transform .22s ease;
+    }
+    .sidebar.mobile-open{transform:translateX(0);}
+    .sidebar.collapsed{width:260px;padding:18px 14px;} /* el modo "colapsado" de escritorio no aplica en mobile */
+    .sidebar.collapsed .nav-label,.sidebar.collapsed .brand-text,.sidebar.collapsed .user-info{display:block;}
+    .sidebar.collapsed .nav-item,.sidebar.collapsed .brand,.sidebar.collapsed .side-meta{justify-content:flex-start;}
+    .collapse-btn{display:none;} /* contraer no aplica cuando el sidebar es un drawer */
+    .sidebar-backdrop.open{display:block;}
+    main{padding:20px 16px 50px;}
+    .page-head h1{font-size:19px;}
+    .metric-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .field-row{grid-template-columns:1fr;}
+    .filters-bar{grid-template-columns:1fr 1fr;}
+    .two-col{grid-template-columns:1fr;}
+    .actions-row{flex-wrap:wrap;}
+    .actions-row .outline-btn{flex:1 1 45%;}
+    #email-preview-frame{height:380px;}
+    #email-edit-textarea{min-height:300px;}
+    table{font-size:12px;}
+    th,td{padding:9px 12px;white-space:nowrap;}
+  }
+
+  @media(max-width:480px){
+    .metric-grid{grid-template-columns:1fr;}
+    .filters-bar{grid-template-columns:1fr;}
+    .actions-row{flex-direction:column;}
+    .actions-row .outline-btn{flex:1 1 auto;}
+    .login-card{padding:32px 22px;}
+    .page-head{flex-direction:column;align-items:flex-start;}
+  }
+
+  /* Cualquier tabla dentro de un section-card puede volverse más ancha que la
+     pantalla en mobile — que se pueda desplazar en horizontal en vez de romper el layout. */
+  .section-card{overflow-x:auto;}
 </style>
 </head>
 <body>
@@ -279,6 +328,13 @@
 </div>
 
 <div class="app" id="app-root" style="display:none">
+  <div class="mobile-topbar">
+    <button class="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Abrir menú">
+      <svg viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
+    <div class="mobile-brand">SMART QA</div>
+  </div>
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileSidebar()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="mark"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -612,6 +668,7 @@ function setView(view, el, label){
   if(view === 'placeholder'){
     document.getElementById('ph-title').textContent = label;
   }
+  closeMobileSidebar();
 }
 
 function irAGenerar(){
@@ -848,6 +905,16 @@ function onHelios(input){
 
 function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+function toggleMobileSidebar(){
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+  document.getElementById('sidebar-backdrop').classList.toggle('open');
+}
+
+function closeMobileSidebar(){
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
 }
 
 /* --- Búsqueda simulada de caso por PO --- */
