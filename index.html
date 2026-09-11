@@ -322,7 +322,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.3.1</div>
+    <div class="login-version">v0.3.2</div>
   </div>
 </div>
 
@@ -841,11 +841,11 @@ function renderCalls(){
         </button>
       </div>
       <div class="field-row">
-        <div class="field"><label>ID</label><input type="text" value="${esc(call.callId)}" oninput="updateCall(${call.id},'callId',this.value)"></div>
-        <div class="field"><label>Hora</label><input type="text" value="${esc(call.hora)}" oninput="updateCall(${call.id},'hora',this.value)"></div>
+        <div class="field"><label>ID</label><input type="text" placeholder="Ej. CO-88213" value="${esc(call.callId)}" oninput="updateCall(${call.id},'callId',this.value)"></div>
+        <div class="field"><label>Hora</label><input type="text" placeholder="Ej. 09:14" value="${esc(call.hora)}" oninput="updateCall(${call.id},'hora',this.value)"></div>
       </div>
-      <div class="field"><label>Agente</label><input type="text" value="${esc(call.agente)}" oninput="updateCall(${call.id},'agente',this.value)"></div>
-      <div class="field"><label>Resumen / transcripción</label><textarea oninput="updateCall(${call.id},'resumen',this.value)">${esc(call.resumen)}</textarea></div>
+      <div class="field"><label>Agente</label><input type="text" placeholder="Nombre del agente" value="${esc(call.agente)}" oninput="updateCall(${call.id},'agente',this.value)"></div>
+      <div class="field"><label>Resumen / transcripción</label><textarea placeholder="Qué pasó en esta llamada…" oninput="updateCall(${call.id},'resumen',this.value)">${esc(call.resumen)}</textarea></div>
     </div>
   `).join('');
 }
@@ -1283,8 +1283,6 @@ async function enviarCorreo(){
 }
 
 // init
-calls.push({id: ++callSeq, callId:'CO-88213', hora:'09:14', agente:'Laura Gómez', resumen:'Cliente pregunta por la hora de llegada del técnico. El agente confirma franja pero no valida disponibilidad real con el operador.'});
-calls.push({id: ++callSeq, callId:'CO-88240', hora:'14:02', agente:'Laura Gómez', resumen:'Cliente reporta que nadie llegó. El agente reagenda para el día siguiente sin ofrecer compensación ni dejar seguimiento documentado.'});
 renderCalls();
 renderCasosTable();
 onMetPaisChange();

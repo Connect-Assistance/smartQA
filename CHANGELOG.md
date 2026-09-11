@@ -43,3 +43,7 @@ Versión base del demo, con todo lo construido hasta ahora:
 ## v0.3.1 — 2026-09-11
 
 - El demo pasa a llamar directo al proxy real `sendMailProxy` (`audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMailProxy`), que maneja el Bearer token del lado de Azure. Ya no depende de una Function App propia deployada por separado para enviar — el HTML del correo y el adjunto (si hay evidencia Helios) se arman en el navegador y se mandan directo con el formato documentado (`dest`, `subject`, `message`, `attachment`).
+
+## v0.3.2 — 2026-09-11
+
+- Saca la data de ejemplo que quedaba precargada al abrir "Generar correo" (dos llamadas de muestra). Ahora el formulario arranca vacío del todo — solo queda orientación como placeholder en cada campo (ID, hora, agente, resumen), sin ningún valor real cargado por defecto.
