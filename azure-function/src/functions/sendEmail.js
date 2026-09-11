@@ -1,5 +1,4 @@
 const { app } = require('@azure/functions');
-const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,16 +8,37 @@ const path = require('path');
  * Body esperado (viene directo del JSON que devuelve generateEmail):
  * {
  *   "dirigido": "equipo@ejemplo.com",     // destinatario (requerido)
- *   "copiaSupervisor": "sup@ejemplo.com", // opcional, va en CC
+ *   "copiaSupervisor": "sup@ejemplo.com", // opcional — ver nota abajo, la Send Mail API no soporta CC
  *   "asunto": "Trazabilidad de calidad – Caso 45210 – Movistar Home",
  *   "alerta": "VERDE" | "AMARILLO" | "ROJO",
  *   "alerta_razon": "razón corta",
  *   "cuerpo": "texto plano completo del correo generado"
  * }
  *
- * Variables de entorno (App Settings en Azure, nunca hardcodeadas):
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_APP_PASSWORD, ALLOWED_ORIGIN
+ * Esta función es un PUENTE hacia la Send Mail API real de Connect
+ * (documentación: SendMail-API-Connect.pdf, v1.0 sep 2026), que corre sobre
+ * el mismo Function App que usa AuditQA:
+ *   https://audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMail
+ *
+ * El navegador nunca llama a esa API directo — le pega a ESTA función (con
+ * su propia function key), y esta función hace la llamada del lado del
+ * servidor con el Bearer token real, que solo vive acá como variable de
+ * entorno. Así el token de la Send Mail API nunca queda expuesto en el
+ * navegador ni en el repo.
+ *
+ * Variables de entorno requeridas (App Settings en Azure):
+ *   SEND_MAIL_API_TOKEN  — el Bearer token de la Send Mail API (nunca hardcodeado)
+ *   ALLOWED_ORIGIN        — https://quality-sendemail.connectlabs.tech
+ *
+ * IMPORTANTE — límite de la Send Mail API: 10 solicitudes por hora POR IP.
+ * Como esta función llama del lado del servidor, todas las llamadas salen
+ * con la misma IP del Function App — ese límite de 10/hora se comparte entre
+ * TODO el equipo que use "Enviar correo" en SMART QA, no es 10 por persona.
+ * Si el equipo crece, esto va a haber que revisarlo con quien administre la
+ * Send Mail API.
  */
+
+const SEND_MAIL_API_URL = 'https://audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMail';
 
 const SEMAFORO_COLORS = {
   VERDE:    { bg: '#E4F5EC', fg: '#1E8E5A', label: 'Verde' },
@@ -65,18 +85,6 @@ function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo }) {
   return html;
 }
 
-function buildTransport() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: true, // true para el puerto 465 (SSL)
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_APP_PASSWORD, // App Password de 16 caracteres, no la password normal de la cuenta
-    },
-  });
-}
-
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
@@ -100,32 +108,44 @@ app.http('sendEmail', {
       return { status: 400, headers: corsHeaders(), jsonBody: { error: 'Body inválido, se esperaba JSON.' } };
     }
 
-    const { dirigido, copiaSupervisor, asunto, alerta, alerta_razon, cuerpo } = body || {};
+    const { dirigido, asunto, alerta, alerta_razon, cuerpo } = body || {};
 
     if (!dirigido || !cuerpo) {
       return { status: 400, headers: corsHeaders(), jsonBody: { error: 'Falta "dirigido" o "cuerpo".' } };
     }
-    if (!process.env.SMTP_USER || !process.env.SMTP_APP_PASSWORD) {
-      context.error('Faltan SMTP_USER / SMTP_APP_PASSWORD en la configuración de la Function App.');
-      return { status: 500, headers: corsHeaders(), jsonBody: { error: 'Configuración SMTP incompleta en el servidor.' } };
+    if (!process.env.SEND_MAIL_API_TOKEN) {
+      context.error('Falta SEND_MAIL_API_TOKEN en la configuración de la Function App.');
+      return { status: 500, headers: corsHeaders(), jsonBody: { error: 'Configuración de envío incompleta en el servidor.' } };
     }
 
     try {
       const htmlBody = buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo });
-      const transporter = buildTransport();
-      const info = await transporter.sendMail({
-        from: `"Equipo de Calidad y Formación Regional" <${process.env.SMTP_USER}>`,
-        to: dirigido,
-        cc: copiaSupervisor || undefined,
-        subject: asunto || 'Trazabilidad de calidad',
-        text: cuerpo,   // fallback en texto plano, por si el cliente de correo no muestra HTML
-        html: htmlBody,
+
+      const response = await fetch(SEND_MAIL_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SEND_MAIL_API_TOKEN}`,
+        },
+        body: JSON.stringify({
+          dest: dirigido,
+          subject: asunto || 'Trazabilidad de calidad',
+          message: htmlBody,
+        }),
       });
 
-      context.log(`Correo enviado. messageId=${info.messageId}`);
-      return { status: 200, headers: corsHeaders(), jsonBody: { ok: true, messageId: info.messageId } };
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        context.error('Send Mail API respondió con error:', response.status, data);
+        // 429 = límite de 10/hora superado — se lo pasamos al front tal cual para que lo muestre.
+        return { status: response.status, headers: corsHeaders(), jsonBody: { error: 'La Send Mail API rechazó el envío.', detail: data } };
+      }
+
+      context.log(`Correo enviado. messageId=${data?.mailersend?.messageId || 'desconocido'}`);
+      return { status: 200, headers: corsHeaders(), jsonBody: { ok: true, messageId: data?.mailersend?.messageId } };
     } catch (err) {
-      context.error('Error enviando correo por SMTP:', err);
+      context.error('Error llamando a la Send Mail API:', err);
       return { status: 500, headers: corsHeaders(), jsonBody: { error: 'No se pudo enviar el correo.', detail: err.message } };
     }
   },

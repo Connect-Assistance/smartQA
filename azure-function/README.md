@@ -1,18 +1,26 @@
-# SMART QA — Función de envío de correo (SMTP)
+# SMART QA — Azure Function (generación + envío de correo)
 
-Azure Function (v4, Node 20) que recibe el correo de trazabilidad ya generado
-por el demo y lo envía de verdad por SMTP (Gmail). El demo en GitHub Pages es
-estático — no puede mandar correo por sí solo — así que llama a esta función
-por `fetch`.
+Azure Function (v4, Node 20) con dos endpoints:
 
-## 1. Conseguir un App Password de Gmail
+- `generateEmail` — genera el correo de trazabilidad llamando a la API de
+  Claude (key guardada del lado del servidor).
+- `sendEmail` — arma el HTML del correo y lo manda como **puente** hacia la
+  Send Mail API real de Connect (documentación: `SendMail-API-Connect.pdf`),
+  que ya corre sobre el mismo Function App que usa AuditQA
+  (`audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMail`,
+  MailerSend por debajo). El navegador nunca le pega directo a esa API — le
+  pega a `sendEmail`, y `sendEmail` hace la llamada real con el Bearer token
+  guardado como variable de entorno acá, nunca expuesto en el navegador.
 
-Necesita 2FA activado en `dayana.alvarado@connect.inc`. Luego:
-Google Account → Seguridad → Verificación en 2 pasos → Contraseñas de
-aplicaciones → generar una de 16 caracteres. Si el Workspace de Connect
-tiene las App Passwords deshabilitadas a nivel admin, hay que pedirle a
-quien administre Workspace que las habilite para esta cuenta (o usar OAuth2
-en vez de App Password — es más trabajo, avisen si prefieren esa vía).
+El demo en GitHub Pages es estático — no puede generar con IA real ni
+mandar correo por sí solo — así que llama a estas dos funciones por `fetch`.
+
+## 1. Conseguir las credenciales
+
+- **API key de Anthropic**, para `generateEmail`.
+- **Bearer token de la Send Mail API** (`API_AUTH_TOKEN` en la documentación
+  del PDF), para `sendEmail` — pedirlo a quien administre esa API si no lo
+  tenés todavía.
 
 ## 2. Crear la Function App en Azure
 
@@ -37,11 +45,8 @@ az functionapp config appsettings set \
   --name smartqa-send-email \
   --resource-group rg-smartqa \
   --settings \
-    SMTP_HOST="smtp.gmail.com" \
-    SMTP_PORT="465" \
-    SMTP_USER="dayana.alvarado@connect.inc" \
-    SMTP_APP_PASSWORD="<el-app-password-de-16-caracteres>" \
     ANTHROPIC_API_KEY="<tu-api-key-de-Anthropic>" \
+    SEND_MAIL_API_TOKEN="<el-bearer-token-de-la-Send-Mail-API>" \
     ALLOWED_ORIGIN="https://quality-sendemail.connectlabs.tech"
 ```
 
@@ -74,3 +79,12 @@ https://smartqa-send-email.azurewebsites.net/api/generateEmail?code=<la-function
 ```
 
 Pasame esas dos URLs completas (con el `?code=...`) y conecto ambos botones del demo.
+
+## Límite a tener en cuenta
+
+La Send Mail API acepta **máximo 10 solicitudes por hora por IP**. Como
+`sendEmail` llama del lado del servidor, todas las llamadas salen con la
+misma IP del Function App — ese límite se comparte entre **todo el equipo**
+que use "Enviar correo" en SMART QA, no es 10 por persona. Si el volumen de
+correos reales supera eso, hay que hablarlo con quien administra la Send
+Mail API (posiblemente subir el límite o repartir el tráfico).

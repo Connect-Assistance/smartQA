@@ -4,10 +4,8 @@
     "AzureWebJobsStorage": "",
     "FUNCTIONS_WORKER_RUNTIME": "node",
 
-    "SMTP_HOST": "smtp.gmail.com",
-    "SMTP_PORT": "465",
-    "SMTP_USER": "dayana.alvarado@connect.inc",
-    "SMTP_APP_PASSWORD": "REEMPLAZAR_CON_APP_PASSWORD_DE_16_CARACTERES",
+    "ANTHROPIC_API_KEY": "REEMPLAZAR_CON_TU_API_KEY_DE_ANTHROPIC",
+    "SEND_MAIL_API_TOKEN": "REEMPLAZAR_CON_EL_BEARER_TOKEN_DE_LA_SEND_MAIL_API",
 
     "ALLOWED_ORIGIN": "https://quality-sendemail.connectlabs.tech"
   }

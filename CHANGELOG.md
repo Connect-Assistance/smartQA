@@ -3,6 +3,12 @@
 Formato: `vMAJOR.MINOR.PATCH` — visible en la pantalla de login.
 Cada entrada resume el cambio, no el detalle línea por línea (eso vive en los commits de `daya`/`main`).
 
+## v0.2.0 — 2026-09-11
+
+- `sendEmail` deja de usar SMTP/Gmail directo y pasa a ser un puente seguro hacia la Send Mail API real de Connect (documentación en `docs/SendMail-API-Connect.pdf`), que corre sobre el mismo Function App que AuditQA. El Bearer token vive solo del lado del servidor.
+- Botón "Enviar correo" del demo queda conectado a `sendEmail` (activo en cuanto se cargue `SEND_EMAIL_ENDPOINT` con la URL real; sigue simulado mientras esté vacío).
+- Documentado el límite real de la Send Mail API: 10 solicitudes/hora compartidas entre todo el equipo (la IP es la del Function App, no la de cada persona).
+
 ## v0.1.0 — 2026-09-11
 
 Versión base del demo, con todo lo construido hasta ahora:

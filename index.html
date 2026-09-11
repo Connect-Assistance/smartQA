@@ -322,7 +322,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.1.0</div>
+    <div class="login-version">v0.2.0</div>
   </div>
 </div>
 
@@ -1219,7 +1219,11 @@ function abrirGmail(){
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank');
 }
 
-function enviarCorreo(){
+// Cuando tengas la Azure Function de envío deployada, pegá acá su URL
+// completa (con ?code=...). Vacío = se queda en modo simulado.
+const SEND_EMAIL_ENDPOINT = '';
+
+async function enviarCorreo(){
   const btn = document.getElementById('send-btn');
   const label = document.getElementById('send-label');
   const status = document.getElementById('send-status');
@@ -1228,12 +1232,39 @@ function enviarCorreo(){
   label.innerHTML = '<span class="spin"></span> Enviando…';
   status.innerHTML = '';
 
-  setTimeout(()=>{
+  if(!SEND_EMAIL_ENDPOINT){
+    setTimeout(()=>{
+      const hora = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
+      status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora} <span class="sent-tag">simulado</span></div>`;
+      btn.disabled = false;
+      label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg> Enviar correo';
+    }, 900);
+    return;
+  }
+
+  try{
+    const response = await fetch(SEND_EMAIL_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        dirigido,
+        asunto: lastEmailSubject,
+        alerta: lastAlerta,
+        alerta_razon: lastAlertaRazon,
+        cuerpo: lastEmailText,
+      }),
+    });
+    const data = await response.json().catch(()=>({}));
+    if(!response.ok){ throw new Error(data.error || ('La función respondió con error ' + response.status)); }
+
     const hora = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
-    status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora} <span class="sent-tag">simulado</span></div>`;
+    status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora}</div>`;
+  } catch(err){
+    status.innerHTML = `<div class="error-box">No se pudo enviar el correo: ${esc(err.message)}</div>`;
+  } finally {
     btn.disabled = false;
     label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg> Enviar correo';
-  }, 900);
+  }
 }
 
 // init
