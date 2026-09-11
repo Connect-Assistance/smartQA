@@ -70,3 +70,7 @@ Versión base del demo, con todo lo construido hasta ahora:
 - Fix de contenido: la descripción del caso ahora incluye la Fecha del evento — faltaba, y el HTML de referencia la pide como campo obligatorio.
 - Evidencia Helios rediseñada: zona de arrastrar y soltar (drag & drop) además de clic para elegir, con miniatura de la imagen adjunta y botón "Quitar imagen" — antes solo se veía el nombre del archivo, sin poder verla ni sacarla.
 - La salida ahora muestra un resumen rápido (Asunto / Para / País) antes de la vista previa, con botón para copiar solo el asunto.
+
+## v0.6.1 — 2026-09-11
+
+- El panel de salida ahora tiene su propio control de evidencia ("Adjuntar" / "Cambiar" / "Quitar") — se puede agregar o sacar la captura de Helios directo desde ahí, sin volver al formulario. Es el mismo adjunto en los dos lados: cambiarlo desde el formulario o desde la salida actualiza la vista previa al instante, preservando cualquier edición de texto ya hecha en el cuerpo.
