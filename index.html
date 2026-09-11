@@ -322,7 +322,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.3.0</div>
+    <div class="login-version">v0.3.1</div>
   </div>
 </div>
 
@@ -1226,9 +1226,11 @@ function abrirGmail(){
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank');
 }
 
-// Cuando tengas la Azure Function de envío deployada, pegá acá su URL
-// completa (con ?code=...). Vacío = se queda en modo simulado.
-const SEND_EMAIL_ENDPOINT = '';
+// Proxy real de la Send Mail API — ya maneja el Bearer token del lado de
+// Azure, así que el navegador le puede pegar directo sin exponer nada.
+const SEND_EMAIL_ENDPOINT = 'https://audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMailProxy';
+
+const MIME_TO_EXT_JS = {'image/png':'png','image/jpeg':'jpg','image/jpg':'jpg','image/webp':'webp','image/gif':'gif'};
 
 async function enviarCorreo(){
   const btn = document.getElementById('send-btn');
@@ -1239,29 +1241,36 @@ async function enviarCorreo(){
   label.innerHTML = '<span class="spin"></span> Enviando…';
   status.innerHTML = '';
 
-  if(!SEND_EMAIL_ENDPOINT){
-    status.innerHTML = `<div class="error-box">Falta configurar la URL de la función de envío (SEND_EMAIL_ENDPOINT).</div>`;
-    btn.disabled = false;
-    label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg> Enviar correo';
-    return;
-  }
-
   try{
+    const messageHtml = buildEmailPreviewHtml({
+      asunto: lastEmailSubject,
+      alerta: lastAlerta,
+      alerta_razon: lastAlertaRazon,
+      cuerpo: lastEmailText,
+    });
+
+    const payload = {
+      dest: dirigido,
+      subject: lastEmailSubject || 'Trazabilidad de calidad',
+      message: messageHtml,
+    };
+
+    if(heliosBase64){
+      const ext = MIME_TO_EXT_JS[heliosMime] || 'png';
+      payload.attachment = {
+        content: heliosBase64,
+        filename: `evidencia-helios.${ext}`,
+        type: heliosMime || 'image/png',
+      };
+    }
+
     const response = await fetch(SEND_EMAIL_ENDPOINT, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        dirigido,
-        asunto: lastEmailSubject,
-        alerta: lastAlerta,
-        alerta_razon: lastAlertaRazon,
-        cuerpo: lastEmailText,
-        heliosBase64: heliosBase64 || undefined,
-        heliosMime: heliosMime || undefined,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await response.json().catch(()=>({}));
-    if(!response.ok){ throw new Error(data.error || ('La función respondió con error ' + response.status)); }
+    if(!response.ok){ throw new Error(data.error || ('La API respondió con error ' + response.status)); }
 
     const hora = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
     status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora}</div>`;

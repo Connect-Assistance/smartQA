@@ -39,3 +39,7 @@ Versión base del demo, con todo lo construido hasta ahora:
 ## v0.3.0 — 2026-09-11
 
 - Elimina por completo el modo simulado de "Enviar correo". El botón ahora siempre hace el request real contra `sendEmail` (nuestra Function App), que a su vez llama a la Send Mail API del lado del servidor. Si la URL todavía no está configurada, muestra un error claro en vez de fingir un envío exitoso.
+
+## v0.3.1 — 2026-09-11
+
+- El demo pasa a llamar directo al proxy real `sendMailProxy` (`audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMailProxy`), que maneja el Bearer token del lado de Azure. Ya no depende de una Function App propia deployada por separado para enviar — el HTML del correo y el adjunto (si hay evidencia Helios) se arman en el navegador y se mandan directo con el formato documentado (`dest`, `subject`, `message`, `attachment`).
