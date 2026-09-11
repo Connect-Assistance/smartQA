@@ -158,6 +158,8 @@
   .link-btn.small{font-size:12px;padding:4px 0;}
   .field textarea{resize:vertical;min-height:44px;line-height:1.5;border:1px solid var(--border);border-radius:7px;padding:8px 10px;background:#FAFBFD;}
   .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);}
+  .field input.invalid{border-color:var(--red-fg);}
+  .field input.invalid:focus{border-color:var(--red-fg);box-shadow:0 0 0 1px var(--red-fg);}
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 
   .calls-label{font-size:11.5px;font-weight:600;color:var(--text-400);margin:20px 0 10px;letter-spacing:0.01em;}
@@ -233,13 +235,10 @@
 
   .semaforo-line{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#FAFBFD;}
   .view-toggle{display:flex;gap:4px;margin-left:auto;}
-  .vt{border:1px solid var(--border);background:#fff;color:var(--text-600);font-family:'Roboto',sans-serif;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:16px;cursor:pointer;}
+  .vt{border:1px solid var(--border);background:#fff;color:var(--text-600);font-family:'Roboto',sans-serif;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:16px;cursor:pointer;margin-left:auto;}
   .vt:hover{border-color:var(--accent);}
   .vt.active{background:var(--ink);color:#fff;border-color:var(--ink);}
   #email-preview-frame{width:100%;height:460px;border:none;display:block;background:#F5F6FA;}
-  #edit-wrap{padding:16px 20px;}
-  #email-edit-textarea{width:100%;min-height:420px;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'Roboto',sans-serif;font-size:13px;line-height:1.6;color:var(--text-900);resize:vertical;}
-  #email-edit-textarea:focus{outline:none;border-color:var(--accent);}
   .semaforo-reason{font-size:12px;color:var(--text-600);}
   .email-subject{padding:12px 22px 0;font-size:13px;color:var(--text-900);}
   .email-body{padding:22px;white-space:pre-wrap;font-size:13.5px;line-height:1.65;max-height:480px;overflow-y:auto;}
@@ -286,7 +285,6 @@
     .actions-row{flex-wrap:wrap;}
     .actions-row .outline-btn{flex:1 1 45%;}
     #email-preview-frame{height:380px;}
-    #email-edit-textarea{min-height:300px;}
     table{font-size:12px;}
     th,td{padding:9px 12px;white-space:nowrap;}
   }
@@ -322,7 +320,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.3.2</div>
+    <div class="login-version">v0.4.0</div>
   </div>
 </div>
 
@@ -457,7 +455,7 @@
             </div>
             <div class="field-row">
               <div class="field"><label>Aseguradora / Cuenta</label><input type="text" id="f-operador" placeholder="Ej. Movistar Home"></div>
-              <div class="field"><label>Fecha del evento</label><input type="date" id="f-fecha"></div>
+              <div class="field"><label>Fecha del evento</label><input type="date" id="f-fecha" onblur="validarCampoFecha()"></div>
             </div>
             <div class="field"><label>Cliente</label><input type="text" id="f-cliente" placeholder="Nombre del cliente"></div>
 
@@ -474,9 +472,9 @@
               </div>
               <div class="field"><label>Tipo de servicio</label><input type="text" id="f-tipo" placeholder="Ej. Grúa, plomería, cerrajería…"></div>
             </div>
-            <div class="field"><label>Placa del vehículo</label><input type="text" id="f-placa" placeholder="Ej. ABC-123 · N/A si no aplica"></div>
+            <div class="field"><label>Placa del vehículo</label><input type="text" id="f-placa" placeholder="Ej. ABC-123 · N/A si no aplica" onblur="validarCampoPlaca()"></div>
 
-            <div class="field"><label>Dirigido a</label><input type="text" id="f-dirigido" placeholder="Ej. Equipo de Calidad Movistar Home"></div>
+            <div class="field"><label>Dirigido a</label><input type="email" id="f-dirigido" placeholder="Ej. equipo.calidad@connect.inc" onblur="validarCampoDirigido()"></div>
             <div class="field"><label>Descripción del caso</label>
               <textarea id="f-motivo" placeholder="Qué pasó, en pocas palabras…"></textarea>
             </div>
@@ -935,6 +933,91 @@ function collectCaseData(){
   };
 }
 
+/* --- Validación de campos --- */
+function esEmailValido(email){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function esPlacaValida(placa){
+  const p = placa.trim();
+  if(p === '' || p.toUpperCase() === 'N/A') return true;
+  // Formatos de placa laxos (varía por país): letras/números/guion/espacio, 4-10 caracteres, al menos un dígito.
+  return /^[A-Za-z0-9][A-Za-z0-9\- ]{2,8}[A-Za-z0-9]$/.test(p) && /[0-9]/.test(p);
+}
+
+function marcarInvalido(id, invalido){
+  document.getElementById(id).classList.toggle('invalid', invalido);
+}
+
+function validarCampoFecha(){
+  const val = document.getElementById('f-fecha').value;
+  let invalido = false;
+  if(val){
+    const hoy = new Date(); hoy.setHours(23,59,59,999);
+    invalido = new Date(val + 'T00:00:00') > hoy;
+  }
+  marcarInvalido('f-fecha', invalido);
+}
+
+function validarCampoPlaca(){
+  const val = document.getElementById('f-placa').value;
+  marcarInvalido('f-placa', val.trim() !== '' && !esPlacaValida(val));
+}
+
+function validarCampoDirigido(){
+  const val = document.getElementById('f-dirigido').value;
+  marcarInvalido('f-dirigido', val.trim() !== '' && !esEmailValido(val));
+}
+
+function validarFormulario(){
+  const errores = [];
+  const po = document.getElementById('f-po').value.trim();
+  const operador = document.getElementById('f-operador').value.trim();
+  const fecha = document.getElementById('f-fecha').value;
+  const cliente = document.getElementById('f-cliente').value.trim();
+  const tipo = document.getElementById('f-tipo').value.trim();
+  const placa = document.getElementById('f-placa').value.trim();
+  const dirigido = document.getElementById('f-dirigido').value.trim();
+  const motivo = document.getElementById('f-motivo').value.trim();
+
+  if(!po) errores.push('El PO / Caso es obligatorio.');
+  if(!operador) errores.push('La Aseguradora / Cuenta es obligatoria.');
+
+  if(!fecha){
+    errores.push('La Fecha del evento es obligatoria.');
+    marcarInvalido('f-fecha', true);
+  } else {
+    const hoy = new Date(); hoy.setHours(23,59,59,999);
+    const esFutura = new Date(fecha + 'T00:00:00') > hoy;
+    marcarInvalido('f-fecha', esFutura);
+    if(esFutura) errores.push('La Fecha del evento no puede ser futura.');
+  }
+
+  if(!cliente) errores.push('El Cliente es obligatorio.');
+  if(!tipo) errores.push('El Tipo de servicio es obligatorio.');
+
+  if(placa && !esPlacaValida(placa)){
+    errores.push('La Placa del vehículo no tiene un formato válido (o escribí "N/A" si no aplica).');
+    marcarInvalido('f-placa', true);
+  } else {
+    marcarInvalido('f-placa', false);
+  }
+
+  if(!dirigido){
+    errores.push('El campo "Dirigido a" es obligatorio.');
+    marcarInvalido('f-dirigido', true);
+  } else if(!esEmailValido(dirigido)){
+    errores.push('"Dirigido a" debe ser un correo válido (ej. equipo@connect.inc).');
+    marcarInvalido('f-dirigido', true);
+  } else {
+    marcarInvalido('f-dirigido', false);
+  }
+
+  if(!motivo) errores.push('La Descripción del caso es obligatoria.');
+
+  return errores;
+}
+
 // Misma plantilla que azure-function/templates/correo-trazabilidad.html —
 // si se edita una, hay que editar la otra para que la vista previa coincida
 // con lo que realmente se envía.
@@ -957,9 +1040,10 @@ const EMAIL_TEMPLATE_HTML = `<!DOCTYPE html>
           <td style="font-family:Arial, Helvetica, sans-serif; color:#5B647A; font-size:12px; padding-left:10px;">{{SEMAFORO_RAZON}}</td>
         </tr></table>
       </td></tr>
-      <tr><td style="padding:20px 28px 8px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.6; color:#151E33;">
+      <tr><td id="cuerpo-content" style="padding:20px 28px 8px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.6; color:#151E33;">
         {{CUERPO_HTML}}
       </td></tr>
+      {{EVIDENCIA_PREVIEW}}
       <tr><td style="padding:20px 28px 26px;">
         <hr style="border:none; border-top:1px solid #E3E6EE; margin:0 0 16px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
@@ -987,32 +1071,37 @@ function aplicarNegritas(escapedHtml){
   return escapedHtml.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
-function quitarMarcasNegrita(text){
-  return String(text).replace(/\*\*(.+?)\*\*/g, '$1');
-}
-
 function plainTextToHtmlEmail(text){
   return String(text).split(/\n\s*\n/).map(p =>
     `<p style="margin:0 0 14px;">${aplicarNegritas(escapeHtmlEmail(p)).replace(/\n/g,'<br>')}</p>`
   ).join('\n');
 }
 
-function buildEmailPreviewHtml({asunto, alerta, alerta_razon, cuerpo}){
+function buildEmailFrame({asunto, alerta, alerta_razon, cuerpoHtml, evidenciaPreviewHtml}){
   const sem = SEMAFORO_COLORS_JS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS_JS.AMARILLO;
-  let cuerpoHtml = plainTextToHtmlEmail(cuerpo || '');
-  if(heliosBase64){
-    // La Send Mail API entrega esto como adjunto descargable, no inline —
-    // acá se muestra igual como ayuda visual para confirmar cuál captura es.
-    cuerpoHtml += `<div style="margin:6px 0 4px;"><img src="data:${heliosMime || 'image/png'};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;display:block;"></div>`;
-    cuerpoHtml += `<p style="margin:0 0 14px;font-size:12px;color:#8890A0;">(Esta captura se envía como archivo adjunto descargable, no incrustada en el correo.)</p>`;
-  }
   return EMAIL_TEMPLATE_HTML
     .replaceAll('{{ASUNTO}}', escapeHtmlEmail(asunto || ''))
     .replaceAll('{{SEMAFORO_BG}}', sem.bg)
     .replaceAll('{{SEMAFORO_FG}}', sem.fg)
     .replaceAll('{{SEMAFORO_LABEL}}', sem.label)
     .replaceAll('{{SEMAFORO_RAZON}}', escapeHtmlEmail(alerta_razon || ''))
-    .replaceAll('{{CUERPO_HTML}}', cuerpoHtml);
+    .replaceAll('{{CUERPO_HTML}}', cuerpoHtml)
+    .replaceAll('{{EVIDENCIA_PREVIEW}}', evidenciaPreviewHtml || '');
+}
+
+function buildEmailPreviewHtml({asunto, alerta, alerta_razon, cuerpo}){
+  const cuerpoHtml = plainTextToHtmlEmail(cuerpo || '');
+  let evidenciaPreviewHtml = '';
+  if(heliosBase64){
+    // Solo ayuda visual para confirmar cuál captura es — no forma parte del
+    // cuerpo editable ni de lo que se manda como "message" (la imagen viaja
+    // aparte, como adjunto real de la API).
+    evidenciaPreviewHtml = `<tr><td style="padding:0 28px 20px;">
+      <img src="data:${heliosMime || 'image/png'};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;display:block;">
+      <p style="margin:6px 0 0;font-size:12px;color:#8890A0;font-family:Arial, Helvetica, sans-serif;">(Esta captura se envía como archivo adjunto descargable — vista previa, no forma parte del cuerpo del correo.)</p>
+    </td></tr>`;
+  }
+  return buildEmailFrame({asunto, alerta, alerta_razon, cuerpoHtml, evidenciaPreviewHtml});
 }
 
 /* --- Generación local del correo (sin API, sin key) ---
@@ -1124,6 +1213,13 @@ async function generar(){
   const label = document.getElementById('gen-label');
   const errorSlot = document.getElementById('error-slot');
   errorSlot.innerHTML = '';
+
+  const errores = validarFormulario();
+  if(errores.length){
+    errorSlot.innerHTML = `<div class="error-box">${errores.map(e => esc(e)).join('<br>')}</div>`;
+    return;
+  }
+
   btn.disabled = true;
   label.innerHTML = '<span class="spin"></span> Generando…';
 
@@ -1157,17 +1253,11 @@ function renderOutput(parsed){
     <div class="semaforo-line">
       <span class="pill ${semColor}">${semColor.charAt(0).toUpperCase()+semColor.slice(1)}</span>
       <span class="semaforo-reason">${esc(semReason)}</span>
-      <div class="view-toggle">
-        <button class="vt active" id="vt-preview" onclick="setEmailView('preview')">Vista previa</button>
-        <button class="vt" id="vt-edit" onclick="setEmailView('edit')">Editar</button>
-      </div>
+      <button class="vt" id="vt-edit" onclick="toggleEditPreview()">Editar</button>
     </div>
     ${lastEmailSubject ? `<div class="email-subject"><strong>Asunto:</strong> ${esc(lastEmailSubject)}</div>` : ''}
     <div id="preview-wrap">
       <iframe id="email-preview-frame" title="Vista previa del correo" srcdoc="${escAttr(buildEmailPreviewHtml({asunto:lastEmailSubject, alerta:lastAlerta, alerta_razon:lastAlertaRazon, cuerpo:lastEmailText}))}"></iframe>
-    </div>
-    <div id="edit-wrap" style="display:none">
-      <textarea id="email-edit-textarea" oninput="onEditEmail()">${esc(lastEmailText)}</textarea>
     </div>
     <div class="actions-row">
       <button class="outline-btn" onclick="copiarTexto()">
@@ -1193,36 +1283,54 @@ function escAttr(str){
   return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 }
 
-function setEmailView(mode){
-  document.getElementById('preview-wrap').style.display = mode === 'preview' ? 'block' : 'none';
-  document.getElementById('edit-wrap').style.display = mode === 'edit' ? 'block' : 'none';
-  document.getElementById('vt-preview').classList.toggle('active', mode === 'preview');
-  document.getElementById('vt-edit').classList.toggle('active', mode === 'edit');
-  if(mode === 'preview'){
-    refreshPreviewFrame();
-  }
-}
-
-function onEditEmail(){
-  lastEmailText = document.getElementById('email-edit-textarea').value;
-}
-
-function refreshPreviewFrame(){
+// El botón "Editar" hace que el cuerpo del correo, DENTRO de la vista previa
+// misma, se vuelva editable — no hay un modo de texto plano aparte. Lo que
+// se escribe/formatea ahí es literalmente lo que se copia, se manda a Gmail
+// o se envía por la API.
+function toggleEditPreview(){
   const frame = document.getElementById('email-preview-frame');
-  if(frame){
-    frame.srcdoc = buildEmailPreviewHtml({asunto:lastEmailSubject, alerta:lastAlerta, alerta_razon:lastAlertaRazon, cuerpo:lastEmailText});
+  const cuerpo = frame.contentDocument.getElementById('cuerpo-content');
+  const btn = document.getElementById('vt-edit');
+  const editando = cuerpo.isContentEditable;
+
+  if(editando){
+    cuerpo.contentEditable = 'false';
+    cuerpo.style.outline = 'none';
+    btn.textContent = 'Editar';
+    btn.classList.remove('active');
+  } else {
+    cuerpo.contentEditable = 'true';
+    cuerpo.style.outline = '2px dashed var(--accent)';
+    cuerpo.style.outlineOffset = '2px';
+    cuerpo.focus();
+    btn.textContent = 'Listo';
+    btn.classList.add('active');
   }
 }
 
+// Lee el contenido actual de la vista previa (con cualquier edición manual
+// ya aplicada) en vez de depender de lastEmailText, que puede haber quedado
+// desactualizado si la persona editó directo en la vista previa.
+function getCuerpoHtmlActual(){
+  const frame = document.getElementById('email-preview-frame');
+  const cuerpo = frame?.contentDocument?.getElementById('cuerpo-content');
+  return cuerpo ? cuerpo.innerHTML.trim() : plainTextToHtmlEmail(lastEmailText);
+}
 
-function copiarTexto(){ navigator.clipboard.writeText(quitarMarcasNegrita(lastEmailText)); }
+function getCuerpoTextoActual(){
+  const frame = document.getElementById('email-preview-frame');
+  const cuerpo = frame?.contentDocument?.getElementById('cuerpo-content');
+  return cuerpo ? cuerpo.innerText.trim() : lastEmailText;
+}
+
+function copiarTexto(){ navigator.clipboard.writeText(getCuerpoTextoActual()); }
 
 function abrirGmail(){
   const to = encodeURIComponent(document.getElementById('f-dirigido').value || '');
   const po = document.getElementById('f-po').value;
   const operador = document.getElementById('f-operador').value;
   const subject = encodeURIComponent(lastEmailSubject || `Trazabilidad de calidad – Caso ${po} – ${operador}`);
-  const body = encodeURIComponent(quitarMarcasNegrita(lastEmailText));
+  const body = encodeURIComponent(getCuerpoTextoActual());
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank');
 }
 
@@ -1242,11 +1350,12 @@ async function enviarCorreo(){
   status.innerHTML = '';
 
   try{
-    const messageHtml = buildEmailPreviewHtml({
+    const messageHtml = buildEmailFrame({
       asunto: lastEmailSubject,
       alerta: lastAlerta,
       alerta_razon: lastAlertaRazon,
-      cuerpo: lastEmailText,
+      cuerpoHtml: getCuerpoHtmlActual(),
+      evidenciaPreviewHtml: '', // la imagen va como adjunto real, no se duplica en el cuerpo
     });
 
     const payload = {

@@ -47,3 +47,9 @@ Versión base del demo, con todo lo construido hasta ahora:
 ## v0.3.2 — 2026-09-11
 
 - Saca la data de ejemplo que quedaba precargada al abrir "Generar correo" (dos llamadas de muestra). Ahora el formulario arranca vacío del todo — solo queda orientación como placeholder en cada campo (ID, hora, agente, resumen), sin ningún valor real cargado por defecto.
+
+## v0.4.0 — 2026-09-11
+
+- Validaciones nuevas en el formulario: Fecha del evento (obligatoria, no puede ser futura), Placa del vehículo (formato válido o "N/A"), y Dirigido a (debe ser un email válido) — con borde rojo en el campo y un aviso consolidado si falta algo al tocar "Generar correo de trazabilidad".
+- El HTML del correo ahora se puede editar directo en la Vista previa (botón "Editar" hace el cuerpo `contenteditable`, sin una caja de texto plano aparte) — lo que se escribe o formatea ahí es literalmente lo que se copia, se abre en Gmail o se manda por la API.
+- Fix: la imagen de evidencia Helios ya no se duplicaba entre el cuerpo editable y el adjunto real — ahora la vista previa de la imagen queda fuera de la zona editable/enviada, y el adjunto real sigue viajando aparte.
