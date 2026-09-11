@@ -635,12 +635,11 @@ let CURRENT_USER_EMAIL = null;
    Reutiliza el proyecto kai-academy-connect. Pegá acá el firebaseConfig real
    (Firebase Console → Configuración del proyecto → Tus apps → SDK de Firebase). */
 const firebaseConfig = {
-  apiKey: "PEGAR_AQUI",
+  apiKey: "AIzaSyBTmyIHAAee68KRiMmthNUue5ayVvWU-3s",
   authDomain: "kai-academy-connect.firebaseapp.com",
-  projectId: "kai-academy-connect",
-  storageBucket: "PEGAR_AQUI",
-  messagingSenderId: "PEGAR_AQUI",
-  appId: "PEGAR_AQUI"
+  projectId: "kai-academy-connect"
+  // storageBucket / messagingSenderId / appId no hacen falta solo para Auth —
+  // se agregan acá si en algún momento se suma Storage, Messaging o Analytics.
 };
 firebase.initializeApp(firebaseConfig);
 
