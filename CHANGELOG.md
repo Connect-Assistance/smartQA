@@ -64,3 +64,9 @@ Versión base del demo, con todo lo construido hasta ahora:
 - Persistencia real de casos: cada correo enviado con éxito se guarda en la tabla `smartqa_casos` de Supabase (mismo proyecto RBAC compartido). SQL de creación en `supabase/casos-table.sql`.
 - Overview, Casos y Métricas ahora leen de esa tabla en vez de mostrar ceros fijos — casos por país, distribución del semáforo, casos por semana, y los filtros de Métricas (país/cuenta/fecha/estado) ya calculan sobre datos reales.
 - "Tiempo promedio por caso" queda en "—" hasta que haya una forma real de medir duración por caso — no se inventa ese número.
+
+## v0.6.0 — 2026-09-11
+
+- Fix de contenido: la descripción del caso ahora incluye la Fecha del evento — faltaba, y el HTML de referencia la pide como campo obligatorio.
+- Evidencia Helios rediseñada: zona de arrastrar y soltar (drag & drop) además de clic para elegir, con miniatura de la imagen adjunta y botón "Quitar imagen" — antes solo se veía el nombre del archivo, sin poder verla ni sacarla.
+- La salida ahora muestra un resumen rápido (Asunto / Para / País) antes de la vista previa, con botón para copiar solo el asunto.

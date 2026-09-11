@@ -176,11 +176,19 @@
   .link-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--accent);font-family:'Roboto',sans-serif;font-weight:600;font-size:13px;cursor:pointer;padding:10px 0 4px;}
   .link-btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2.3;fill:none;}
 
-  .evidence-row{display:flex;align-items:center;gap:10px;padding:11px 0;margin:18px 0 4px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
-  .evidence-row svg{width:16px;height:16px;stroke:var(--text-600);stroke-width:2;fill:none;flex-shrink:0;}
-  .evidence-row .et{font-size:12.5px;font-weight:600;flex:1;}
-  .evidence-row .es{font-size:11px;color:var(--text-400);}
-  .file-btn{font-size:11.5px;font-weight:600;color:var(--accent);cursor:pointer;background:var(--blue-bg);padding:5px 10px;border-radius:6px;}
+  .evidence-zone{
+    margin:18px 0 4px;padding:16px;border:1.5px dashed var(--border);border-radius:10px;
+    text-align:center;cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  .evidence-zone:hover, .evidence-zone.drag{border-color:var(--accent);background:var(--blue-bg);}
+  .ev-prompt svg{width:22px;height:22px;stroke:var(--text-400);stroke-width:1.6;fill:none;margin-bottom:6px;}
+  .ev-title{font-size:12.5px;font-weight:600;color:var(--text-900);}
+  .ev-sub{font-size:11px;color:var(--text-400);margin-top:2px;}
+  .evidence-preview{display:flex;align-items:center;gap:10px;text-align:left;}
+  .evidence-preview img{width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;}
+  .evidence-name{flex:1;font-size:12px;color:var(--text-600);word-break:break-all;}
+  .ev-remove{border:none;background:none;color:var(--red-fg);font-size:11.5px;font-weight:600;cursor:pointer;padding:4px 6px;flex-shrink:0;}
+  .ev-remove:hover{text-decoration:underline;}
   input[type=file]{display:none;}
 
   .primary-btn{
@@ -237,6 +245,14 @@
   #email-preview-frame{width:100%;height:460px;border:none;display:block;background:#F5F6FA;}
   .semaforo-reason{font-size:12px;color:var(--text-600);}
   .email-subject{padding:12px 22px 0;font-size:13px;color:var(--text-900);}
+  .output-summary{padding:12px 22px;border-bottom:1px solid var(--border);background:#FAFBFD;}
+  .os-row{display:flex;align-items:center;gap:8px;padding:2px 0;font-size:12.5px;}
+  .os-label{width:48px;flex-shrink:0;color:var(--text-400);font-weight:600;}
+  .os-value{flex:1;color:var(--text-900);font-weight:600;}
+  .os-value.muted{color:var(--text-600);font-weight:400;}
+  .os-copy{border:none;background:none;color:var(--text-400);cursor:pointer;padding:2px;flex-shrink:0;}
+  .os-copy:hover{color:var(--accent);}
+  .os-copy svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;}
   .email-body{padding:22px;white-space:pre-wrap;font-size:13.5px;line-height:1.65;max-height:480px;overflow-y:auto;}
   .actions-row{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);}
   .outline-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-family:'Roboto',sans-serif;font-weight:600;font-size:12.5px;color:var(--text-900);cursor:pointer;}
@@ -317,7 +333,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.5.0</div>
+    <div class="login-version">v0.6.0</div>
   </div>
 </div>
 
@@ -488,11 +504,21 @@
               Agregar llamada
             </button>
 
-            <div class="evidence-row">
-              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5.5-5-4 4L8 12l-5 5"/></svg>
-              <div class="et">Evidencia Helios<div class="es" id="evidence-status">Sin archivo adjunto</div></div>
-              <label class="file-btn" for="f-helios">Adjuntar</label>
-              <input type="file" id="f-helios" accept="image/*" onchange="onHelios(this)">
+            <div class="evidence-zone" id="evidence-zone" onclick="document.getElementById('f-helios').click()"
+                 ondragover="event.preventDefault(); this.classList.add('drag')"
+                 ondragleave="this.classList.remove('drag')"
+                 ondrop="onHeliosDrop(event)">
+              <input type="file" id="f-helios" accept="image/*" onchange="onHelios(this.files[0])" style="display:none">
+              <div id="evidence-prompt" class="ev-prompt">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5.5-5-4 4L8 12l-5 5"/></svg>
+                <div class="ev-title">Evidencia Helios</div>
+                <div class="ev-sub">Arrastrá la captura acá o hacé clic para elegir · PNG, JPG</div>
+              </div>
+              <div class="evidence-preview" id="evidence-preview" style="display:none">
+                <img id="evidence-thumb" alt="Evidencia Helios">
+                <div class="evidence-name" id="evidence-filename"></div>
+                <button type="button" class="ev-remove" onclick="event.stopPropagation(); quitarEvidencia()">✕ Quitar imagen</button>
+              </div>
             </div>
 
             <button class="primary-btn" id="gen-btn" onclick="generar()">
@@ -928,15 +954,38 @@ function addCall(){ calls.push(newCall()); renderCalls(); }
 function removeCall(id){ calls = calls.filter(c=>c.id!==id); renderCalls(); }
 function updateCall(id,field,val){ const c = calls.find(c=>c.id===id); if(c) c[field]=val; }
 
-function onHelios(input){
-  const file = input.files[0];
-  const status = document.getElementById('evidence-status');
-  if(!file){ heliosBase64=null; heliosMime=null; status.textContent='Sin archivo adjunto'; return; }
-  status.textContent = file.name;
+function onHelios(file){
+  if(!file){ quitarEvidencia(); return; }
   heliosMime = file.type;
   const reader = new FileReader();
-  reader.onload = () => { heliosBase64 = reader.result.split(',')[1]; };
+  reader.onload = () => {
+    heliosBase64 = reader.result.split(',')[1];
+    mostrarPreviewEvidencia(reader.result, file.name);
+  };
   reader.readAsDataURL(file);
+}
+
+function onHeliosDrop(e){
+  e.preventDefault();
+  document.getElementById('evidence-zone').classList.remove('drag');
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(file) onHelios(file);
+}
+
+function mostrarPreviewEvidencia(dataUrl, filename){
+  document.getElementById('evidence-prompt').style.display = 'none';
+  const preview = document.getElementById('evidence-preview');
+  preview.style.display = 'flex';
+  document.getElementById('evidence-thumb').src = dataUrl;
+  document.getElementById('evidence-filename').textContent = filename;
+}
+
+function quitarEvidencia(){
+  heliosBase64 = null;
+  heliosMime = null;
+  document.getElementById('f-helios').value = '';
+  document.getElementById('evidence-prompt').style.display = 'block';
+  document.getElementById('evidence-preview').style.display = 'none';
 }
 
 function toggleSidebar(){
@@ -1042,12 +1091,18 @@ function renderMetricas(){
   document.getElementById('met-horas').textContent = Math.round(total * 0.29) + 'h';
 }
 
+function formatearFechaEvento(valorISO){
+  if(!valorISO) return 'No especificada';
+  const d = new Date(valorISO + 'T00:00:00');
+  return d.toLocaleDateString('es-CR', {day:'2-digit', month:'long', year:'numeric'});
+}
+
 function collectCaseData(){
   return {
     pais: document.getElementById('f-pais').value,
     operador: document.getElementById('f-operador').value,
     po: document.getElementById('f-po').value,
-    fecha: document.getElementById('f-fecha').value || 'No especificada',
+    fecha: formatearFechaEvento(document.getElementById('f-fecha').value),
     cliente: document.getElementById('f-cliente').value,
     tipoCaso: document.getElementById('f-tipo-caso').value,
     tipo: document.getElementById('f-tipo').value,
@@ -1297,7 +1352,7 @@ function generarCorreoLocal(d){
   lineas.push('Cordial saludo equipo,');
   lineas.push('');
 
-  let desc = `Este es un caso de tipo **${d.tipoCaso || 'N/E'}**, PO **${d.po || 'N/E'}**, del cliente **${d.cliente || 'N/E'}**, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}.`;
+  let desc = `Este es un caso de tipo **${d.tipoCaso || 'N/E'}**, PO **${d.po || 'N/E'}**, del cliente **${d.cliente || 'N/E'}**, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}, registrado el ${d.fecha || 'N/E'}.`;
   if(d.placa && d.placa.trim().toUpperCase() !== 'N/A' && d.placa.trim() !== '') desc += ` Placa: ${d.placa}.`;
   if(d.motivo) desc += ` ${limpiarTono(d.motivo)}`;
   lineas.push(desc);
@@ -1376,12 +1431,25 @@ function renderOutput(parsed){
   lastAlerta = alerta;
   lastAlertaRazon = semReason;
 
+  const dirigido = document.getElementById('f-dirigido').value || '';
+  const pais = document.getElementById('f-pais').value || '';
+
   document.getElementById('output-area').innerHTML = `
     <div class="semaforo-line">
       <span class="pill ${semColor}">${semColor.charAt(0).toUpperCase()+semColor.slice(1)}</span>
       <span class="semaforo-reason">${esc(semReason)}</span>
     </div>
-    ${lastEmailSubject ? `<div class="email-subject"><strong>Asunto:</strong> ${esc(lastEmailSubject)}</div>` : ''}
+    <div class="output-summary">
+      <div class="os-row">
+        <span class="os-label">Asunto</span>
+        <span class="os-value">${esc(lastEmailSubject)}</span>
+        <button class="os-copy" onclick="copiarAsunto()" title="Copiar asunto">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        </button>
+      </div>
+      <div class="os-row"><span class="os-label">Para</span><span class="os-value muted">${esc(dirigido)}</span></div>
+      <div class="os-row"><span class="os-label">País</span><span class="os-value muted">${esc(pais)}</span></div>
+    </div>
     <div id="preview-wrap">
       <iframe id="email-preview-frame" title="Vista previa del correo" srcdoc="${escAttr(buildEmailPreviewHtml({asunto:lastEmailSubject, alerta:lastAlerta, alerta_razon:lastAlertaRazon, cuerpo:lastEmailText}))}"></iframe>
     </div>
@@ -1457,6 +1525,7 @@ function getCuerpoTextoActual(){
 }
 
 function copiarTexto(){ navigator.clipboard.writeText(getCuerpoTextoActual()); }
+function copiarAsunto(){ navigator.clipboard.writeText(lastEmailSubject); }
 
 
 // Proxy real de la Send Mail API — ya maneja el Bearer token del lado de
