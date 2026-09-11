@@ -380,6 +380,16 @@
               <div class="field"><label>Cliente</label><input type="text" id="f-cliente" readonly></div>
 
               <div class="field-row">
+                <div class="field"><label>Tipo de caso</label>
+                  <select id="f-tipo-caso">
+                    <option>Queja</option>
+                    <option>Reclamo</option>
+                    <option>Urgente — Alerta Operación</option>
+                    <option>Consulta / Seguimiento</option>
+                    <option>PQR</option>
+                    <option>Encuesta</option>
+                  </select>
+                </div>
                 <div class="field"><label>Tipo de servicio</label>
                   <select id="f-tipo">
                     <option>Grúa por accidente</option>
@@ -393,8 +403,8 @@
                     <option>Veterinaria a domicilio</option>
                   </select>
                 </div>
-                <div class="field"><label>Placa del vehículo</label><input type="text" id="f-placa" placeholder="Ej. ABC-123 · N/A si no aplica"></div>
               </div>
+              <div class="field"><label>Placa del vehículo</label><input type="text" id="f-placa" placeholder="Ej. ABC-123 · N/A si no aplica"></div>
 
               <div class="field"><label>Dirigido a</label><input type="text" id="f-dirigido" placeholder="Ej. Equipo de Calidad Movistar Home"></div>
               <div class="field"><label>Descripción del caso</label>
@@ -876,6 +886,7 @@ function collectCaseData(){
     po: document.getElementById('f-po').value,
     fecha: document.getElementById('f-fecha').value || 'No especificada',
     cliente: document.getElementById('f-cliente').value,
+    tipoCaso: document.getElementById('f-tipo-caso').value,
     tipo: document.getElementById('f-tipo').value,
     placa: document.getElementById('f-placa').value || 'N/A',
     dirigido: document.getElementById('f-dirigido').value,
@@ -1003,7 +1014,10 @@ const PALABRAS_CLAVE_ALERTA = ['no llegó','nadie llegó','no valida','no confir
 function calcularSemaforo(d){
   const texto = [d.motivo, d.hallazgosAdicionales, ...d.calls.map(c => c.resumen)].join(' ').toLowerCase();
   const coincidencias = PALABRAS_CLAVE_ALERTA.filter(k => texto.includes(k));
+
+  if(d.tipoCaso === 'Urgente — Alerta Operación') return { alerta:'ROJO', alerta_razon:'Caso marcado como urgente — alerta de operación.' };
   if(coincidencias.length >= 3) return { alerta:'ROJO', alerta_razon:'Varios patrones de incumplimiento detectados en las llamadas.' };
+  if(d.tipoCaso === 'Reclamo' && coincidencias.length === 0) return { alerta:'AMARILLO', alerta_razon:'Caso registrado como reclamo por el cliente.' };
   if(coincidencias.length >= 1) return { alerta:'AMARILLO', alerta_razon:'Se detectan oportunidades de mejora puntuales en el servicio.' };
   return { alerta:'VERDE', alerta_razon:'No se detectan patrones de incumplimiento en las llamadas registradas.' };
 }
@@ -1013,7 +1027,7 @@ function generarCorreoLocal(d){
   lineas.push('Cordial saludo equipo,');
   lineas.push('');
 
-  let desc = `Este es el caso PO ${d.po || 'N/E'}, del cliente ${d.cliente || 'N/E'}, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}.`;
+  let desc = `Este es un caso de tipo ${d.tipoCaso || 'N/E'}, PO ${d.po || 'N/E'}, del cliente ${d.cliente || 'N/E'}, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}.`;
   if(d.placa && d.placa.trim().toUpperCase() !== 'N/A' && d.placa.trim() !== '') desc += ` Placa: ${d.placa}.`;
   if(d.motivo) desc += ` ${limpiarTono(d.motivo)}`;
   lineas.push(desc);
