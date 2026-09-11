@@ -1001,7 +1001,10 @@ function buildEmailPreviewHtml({asunto, alerta, alerta_razon, cuerpo}){
   const sem = SEMAFORO_COLORS_JS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS_JS.AMARILLO;
   let cuerpoHtml = plainTextToHtmlEmail(cuerpo || '');
   if(heliosBase64){
-    cuerpoHtml += `<img src="data:${heliosMime || 'image/png'};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;margin:6px 0 14px;display:block;">`;
+    // La Send Mail API entrega esto como adjunto descargable, no inline —
+    // acá se muestra igual como ayuda visual para confirmar cuál captura es.
+    cuerpoHtml += `<div style="margin:6px 0 4px;"><img src="data:${heliosMime || 'image/png'};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;display:block;"></div>`;
+    cuerpoHtml += `<p style="margin:0 0 14px;font-size:12px;color:#8890A0;">(Esta captura se envía como archivo adjunto descargable, no incrustada en el correo.)</p>`;
   }
   return EMAIL_TEMPLATE_HTML
     .replaceAll('{{ASUNTO}}', escapeHtmlEmail(asunto || ''))

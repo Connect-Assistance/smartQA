@@ -5,19 +5,21 @@ const path = require('path');
 /**
  * POST /api/sendEmail
  *
- * Body esperado (viene directo del JSON que devuelve generateEmail):
+ * Body esperado (viene directo del JSON que devuelve generateEmail, más la
+ * evidencia Helios si se adjuntó una en el formulario):
  * {
  *   "dirigido": "equipo@ejemplo.com",     // destinatario (requerido)
- *   "copiaSupervisor": "sup@ejemplo.com", // opcional — ver nota abajo, la Send Mail API no soporta CC
  *   "asunto": "Trazabilidad de calidad – Caso 45210 – Movistar Home",
  *   "alerta": "VERDE" | "AMARILLO" | "ROJO",
  *   "alerta_razon": "razón corta",
- *   "cuerpo": "texto plano completo del correo generado"
+ *   "cuerpo": "texto plano completo del correo generado",
+ *   "heliosBase64": "...",   // opcional, base64 de la captura de Helios
+ *   "heliosMime": "image/png" // opcional
  * }
  *
  * Esta función es un PUENTE hacia la Send Mail API real de Connect
- * (documentación: SendMail-API-Connect.pdf, v1.0 sep 2026), que corre sobre
- * el mismo Function App que usa AuditQA:
+ * (documentación: docs/SendMail-API-Connect.pdf, v1.1 sep 2026), que corre
+ * sobre el mismo Function App que usa AuditQA:
  *   https://audit-qa-bceva8a6byeyehgx.eastus2-01.azurewebsites.net/api/sendMail
  *
  * El navegador nunca llama a esa API directo — le pega a ESTA función (con
@@ -29,6 +31,13 @@ const path = require('path');
  * Variables de entorno requeridas (App Settings en Azure):
  *   SEND_MAIL_API_TOKEN  — el Bearer token de la Send Mail API (nunca hardcodeado)
  *   ALLOWED_ORIGIN        — https://quality-sendemail.connectlabs.tech
+ *
+ * Nota sobre la evidencia Helios (v1.1 del PDF): la API ya soporta adjuntos
+ * reales (content base64 + filename + type, límite 25MB), pero la
+ * disposición SIEMPRE es "attachment" (archivo descargable) — no hay forma
+ * de que la imagen se vea inline dentro del cuerpo del correo sin hablar con
+ * el equipo de TI que administra la Send Mail API. Por eso acá va como
+ * adjunto real, no incrustada en el HTML.
  *
  * IMPORTANTE — límite de la Send Mail API: 10 solicitudes por hora POR IP.
  * Como esta función llama del lado del servidor, todas las llamadas salen
@@ -44,6 +53,14 @@ const SEMAFORO_COLORS = {
   VERDE:    { bg: '#E4F5EC', fg: '#1E8E5A', label: 'Verde' },
   AMARILLO: { bg: '#FDF1DD', fg: '#B9720C', label: 'Amarillo' },
   ROJO:     { bg: '#FBE7E2', fg: '#C5432A', label: 'Rojo' },
+};
+
+const MIME_TO_EXT = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
 };
 
 const TEMPLATE_PATH = path.join(__dirname, '..', '..', 'templates', 'correo-trazabilidad.html');
@@ -70,17 +87,9 @@ function plainTextToHtml(text) {
     .join('\n');
 }
 
-function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo, heliosBase64, heliosMime }) {
+function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo }) {
   const sem = SEMAFORO_COLORS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS.AMARILLO;
   let html = fs.readFileSync(TEMPLATE_PATH, 'utf8');
-
-  let cuerpoHtml = plainTextToHtml(cuerpo || '');
-  if (heliosBase64) {
-    // La Send Mail API no tiene campo de adjuntos (ver docs/SendMail-API-Connect.pdf) —
-    // la imagen va incrustada como base64 directo dentro del HTML del correo.
-    const mime = heliosMime || 'image/png';
-    cuerpoHtml += `<img src="data:${mime};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;margin:6px 0 14px;display:block;">`;
-  }
 
   html = html
     .replaceAll('{{ASUNTO}}', escapeHtml(asunto || ''))
@@ -88,7 +97,7 @@ function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo, heliosBase64, he
     .replaceAll('{{SEMAFORO_FG}}', sem.fg)
     .replaceAll('{{SEMAFORO_LABEL}}', sem.label)
     .replaceAll('{{SEMAFORO_RAZON}}', escapeHtml(alerta_razon || ''))
-    .replaceAll('{{CUERPO_HTML}}', cuerpoHtml);
+    .replaceAll('{{CUERPO_HTML}}', plainTextToHtml(cuerpo || ''));
 
   return html;
 }
@@ -127,7 +136,22 @@ app.http('sendEmail', {
     }
 
     try {
-      const htmlBody = buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo, heliosBase64, heliosMime });
+      const htmlBody = buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo });
+
+      const payload = {
+        dest: dirigido,
+        subject: asunto || 'Trazabilidad de calidad',
+        message: htmlBody,
+      };
+
+      if (heliosBase64) {
+        const ext = MIME_TO_EXT[heliosMime] || 'png';
+        payload.attachment = {
+          content: heliosBase64,
+          filename: `evidencia-helios.${ext}`,
+          type: heliosMime || 'image/png',
+        };
+      }
 
       const response = await fetch(SEND_MAIL_API_URL, {
         method: 'POST',
@@ -135,11 +159,7 @@ app.http('sendEmail', {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.SEND_MAIL_API_TOKEN}`,
         },
-        body: JSON.stringify({
-          dest: dirigido,
-          subject: asunto || 'Trazabilidad de calidad',
-          message: htmlBody,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json().catch(() => ({}));

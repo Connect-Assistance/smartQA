@@ -25,3 +25,9 @@ Versión base del demo, con todo lo construido hasta ahora:
 ## v0.2.1 — 2026-09-11
 
 - La evidencia Helios (imagen adjunta) ahora se incrusta como base64 directo dentro del HTML del correo (`<img src="data:...;base64,...">`), tanto en la Vista previa del demo como en el envío real vía `sendEmail`. La Send Mail API no tiene campo de adjuntos (ver `docs/SendMail-API-Connect.pdf`), así que viaja como parte del `message`, no como attachment aparte.
+
+## v0.2.2 — 2026-09-11
+
+- Actualiza a la Send Mail API v1.1: ahora soporta adjuntos reales (`attachment.content/filename/type`, hasta 25MB). La evidencia Helios pasa de estar incrustada en el HTML a mandarse como adjunto real de la API.
+- Nota importante documentada: la disposición del adjunto siempre es "attachment" (descargable) — no hay inline sin coordinar con el equipo de TI que administra la API. La Vista previa del demo lo deja explícito.
+- Actualiza `docs/SendMail-API-Connect.pdf` a la v1.1.
