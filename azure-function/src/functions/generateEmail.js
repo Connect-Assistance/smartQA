@@ -39,6 +39,8 @@ Estructura obligatoria del cuerpo del correo (en este orden):
 6. Cierre fijo: "AYUDAMOS PERSONAS"
 7. Firma fija: "Equipo de Calidad y Formación Regional - Connect"
 
+Marcá los títulos importantes en negrita usando **texto** (por ejemplo **Llamada 1 | ID: ... | Hora: ... | Agente: ...**, **Resumen:**, **Oportunidad de mejora:**, **Hallazgos de calidad:**, **AYUDAMOS PERSONAS**) para que el correo sea más fácil de leer.
+
 Respondé ÚNICAMENTE con JSON puro, sin markdown ni texto fuera del JSON:
 {"asunto":"...", "alerta":"VERDE|AMARILLO|ROJO", "alerta_razon":"razón en máximo 12 palabras", "cuerpo":"el correo completo, empezando por el saludo"}
 Usá \\n para los saltos de línea dentro de "cuerpo". No uses comillas dobles dentro del texto.`;

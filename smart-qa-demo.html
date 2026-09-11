@@ -944,9 +944,18 @@ function escapeHtmlEmail(str){
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// El cuerpo usa **texto** para marcar títulos importantes en negrita (estilo Markdown liviano).
+function aplicarNegritas(escapedHtml){
+  return escapedHtml.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function quitarMarcasNegrita(text){
+  return String(text).replace(/\*\*(.+?)\*\*/g, '$1');
+}
+
 function plainTextToHtmlEmail(text){
   return String(text).split(/\n\s*\n/).map(p =>
-    `<p style="margin:0 0 14px;">${escapeHtmlEmail(p).replace(/\n/g,'<br>')}</p>`
+    `<p style="margin:0 0 14px;">${aplicarNegritas(escapeHtmlEmail(p)).replace(/\n/g,'<br>')}</p>`
   ).join('\n');
 }
 
@@ -1027,14 +1036,14 @@ function generarCorreoLocal(d){
   lineas.push('Cordial saludo equipo,');
   lineas.push('');
 
-  let desc = `Este es un caso de tipo ${d.tipoCaso || 'N/E'}, PO ${d.po || 'N/E'}, del cliente ${d.cliente || 'N/E'}, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}.`;
+  let desc = `Este es un caso de tipo **${d.tipoCaso || 'N/E'}**, PO **${d.po || 'N/E'}**, del cliente **${d.cliente || 'N/E'}**, en ${d.pais || 'N/E'}, con la cuenta ${d.operador || 'N/E'}. El servicio es de ${d.tipo || 'N/E'}.`;
   if(d.placa && d.placa.trim().toUpperCase() !== 'N/A' && d.placa.trim() !== '') desc += ` Placa: ${d.placa}.`;
   if(d.motivo) desc += ` ${limpiarTono(d.motivo)}`;
   lineas.push(desc);
   lineas.push('');
 
   if(d.tieneEvidencia){
-    lineas.push('Evidencia Helios: se adjunta captura de pantalla como respaldo del caso.');
+    lineas.push('**Evidencia Helios:** se adjunta captura de pantalla como respaldo del caso.');
     lineas.push('');
   }
 
@@ -1042,20 +1051,20 @@ function generarCorreoLocal(d){
   d.calls.forEach((c, i) => {
     const oportunidad = analizarLlamada(c.resumen);
     if(!hallazgosDeLlamadas.includes(oportunidad)) hallazgosDeLlamadas.push(oportunidad);
-    lineas.push(`Llamada ${i+1} | ID: ${c.callId || 'No especificado'} | Hora: ${c.hora || 'No especificada'} | Agente: ${c.agente || 'No especificado'}`);
-    lineas.push(`Resumen: ${limpiarTono(c.resumen) || 'Sin resumen registrado.'}`);
-    lineas.push(`Oportunidad de mejora: ${oportunidad}`);
+    lineas.push(`**Llamada ${i+1} | ID: ${c.callId || 'No especificado'} | Hora: ${c.hora || 'No especificada'} | Agente: ${c.agente || 'No especificado'}**`);
+    lineas.push(`**Resumen:** ${limpiarTono(c.resumen) || 'Sin resumen registrado.'}`);
+    lineas.push(`**Oportunidad de mejora:** ${oportunidad}`);
     lineas.push('');
   });
 
-  lineas.push('Hallazgos de calidad:');
+  lineas.push('**Hallazgos de calidad:**');
   const hallazgosFinal = [];
   if(d.hallazgosAdicionales) hallazgosFinal.push(limpiarTono(d.hallazgosAdicionales));
   hallazgosDeLlamadas.forEach(h => { if(hallazgosFinal.length < 3 && !hallazgosFinal.includes(h)) hallazgosFinal.push(h); });
   if(hallazgosFinal.length === 0) hallazgosFinal.push('No se identifican patrones adicionales fuera de lo ya mencionado en las llamadas.');
   hallazgosFinal.slice(0, 3).forEach(h => lineas.push(`— ${h}`));
   lineas.push('');
-  lineas.push('AYUDAMOS PERSONAS');
+  lineas.push('**AYUDAMOS PERSONAS**');
   lineas.push('');
   lineas.push('Equipo de Calidad y Formación Regional - Connect');
 
@@ -1161,14 +1170,14 @@ function refreshPreviewFrame(){
 }
 
 
-function copiarTexto(){ navigator.clipboard.writeText(lastEmailText); }
+function copiarTexto(){ navigator.clipboard.writeText(quitarMarcasNegrita(lastEmailText)); }
 
 function abrirGmail(){
   const to = encodeURIComponent(document.getElementById('f-dirigido').value || '');
   const po = document.getElementById('f-po').value;
   const operador = document.getElementById('f-operador').value;
   const subject = encodeURIComponent(lastEmailSubject || `Trazabilidad de calidad – Caso ${po} – ${operador}`);
-  const body = encodeURIComponent(lastEmailText);
+  const body = encodeURIComponent(quitarMarcasNegrita(lastEmailText));
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank');
 }
 

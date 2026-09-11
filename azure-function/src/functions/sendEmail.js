@@ -35,12 +35,17 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+// El cuerpo usa **texto** para marcar títulos importantes en negrita (estilo Markdown liviano).
+function aplicarNegritas(escapedHtml) {
+  return escapedHtml.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
 // Convierte el texto plano del cuerpo (con \n\n entre párrafos) a HTML seguro para correo.
 function plainTextToHtml(text) {
   return String(text)
     .split(/\n\s*\n/)
     .map(paragraph =>
-      `<p style="margin:0 0 14px;">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`
+      `<p style="margin:0 0 14px;">${aplicarNegritas(escapeHtml(paragraph)).replace(/\n/g, '<br>')}</p>`
     )
     .join('\n');
 }
