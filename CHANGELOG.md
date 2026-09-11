@@ -31,3 +31,7 @@ Versión base del demo, con todo lo construido hasta ahora:
 - Actualiza a la Send Mail API v1.1: ahora soporta adjuntos reales (`attachment.content/filename/type`, hasta 25MB). La evidencia Helios pasa de estar incrustada en el HTML a mandarse como adjunto real de la API.
 - Nota importante documentada: la disposición del adjunto siempre es "attachment" (descargable) — no hay inline sin coordinar con el equipo de TI que administra la API. La Vista previa del demo lo deja explícito.
 - Actualiza `docs/SendMail-API-Connect.pdf` a la v1.1.
+
+## v0.2.2.1 — 2026-09-11 (fix)
+
+- Corrige el número de versión visible en el login, que se había quedado en v0.1.0 por un error mío en el proceso de deploy anterior (bumpeaba la copia del clon temporal, no el archivo fuente, así que el próximo deploy volvía a pisarlo). El contenido funcional ya estaba correcto desde v0.2.2 — este fix es solo del número mostrado.
