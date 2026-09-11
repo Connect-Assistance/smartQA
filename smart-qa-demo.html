@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{
     --sidebar-bg:#FFFFFF;
@@ -33,6 +35,23 @@
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text-900);font-family:'Roboto',sans-serif;-webkit-font-smoothing:antialiased;}
   .app{display:flex;min-height:100vh;}
+
+  /* LOGIN */
+  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px 36px;width:340px;text-align:center;}
+  .login-mark{width:44px;height:44px;border-radius:12px;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
+  .login-mark svg{width:22px;height:22px;stroke:#fff;stroke-width:2.6;fill:none;}
+  .login-brand{font-family:'Roboto',sans-serif;font-weight:800;font-size:19px;color:var(--text-900);}
+  .login-sub{font-size:12.5px;color:var(--text-600);margin-top:3px;margin-bottom:28px;}
+  .google-btn{
+    width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:11px;border:1px solid var(--border);border-radius:8px;background:#fff;
+    font-family:'Roboto',sans-serif;font-weight:600;font-size:13.5px;color:var(--text-900);cursor:pointer;
+  }
+  .google-btn:hover{border-color:var(--text-400);box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+  .login-note{font-size:11.5px;color:var(--text-400);margin-top:18px;}
+  #login-error{margin-top:14px;}
+  #login-error .error-box{margin:0;}
 
   /* SIDEBAR */
   .sidebar{
@@ -241,7 +260,26 @@
 </head>
 <body>
 
-<div class="app">
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-mark"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="login-brand">SMART QA</div>
+    <div class="login-sub">Connect Asistencias Extraordinarias</div>
+    <button class="google-btn" id="login-btn" onclick="iniciarSesion()">
+      <svg viewBox="0 0 48 48" width="18" height="18">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 6.1 29.5 4 24 4c-7.5 0-14 4.2-17.7 10.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.4 0 10.3-1.8 14-5l-6.5-5.4C29.4 35.4 26.8 36 24 36c-5.2 0-9.6-3.1-11.3-7.5l-6.6 5.1C9.9 39.7 16.4 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C39.9 36.7 44 31 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+      </svg>
+      Continuar con Google
+    </button>
+    <div class="login-note">Solo cuentas <strong>@connect.inc</strong> pueden acceder</div>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<div class="app" id="app-root" style="display:none">
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="mark"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -279,7 +317,10 @@
         </div>
       </div>
       <div class="side-meta">
-        <span class="nav-label">v1.0 · demo</span>
+        <button class="collapse-btn" onclick="cerrarSesion()">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span class="nav-label">Salir</span>
+        </button>
         <button class="collapse-btn" onclick="toggleSidebar()">
           <svg viewBox="0 0 24 24"><polyline points="15 6 9 12 15 18"/></svg>
           <span class="nav-label">Contraer</span>
@@ -585,10 +626,86 @@ const SUPABASE_URL = 'https://dednkgonnirybnpktbzp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlZG5rZ29ubmlyeWJucGt0YnpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzM3MTQsImV4cCI6MjA5NTU0OTcxNH0.uesxb4ph8SYKOHR5y6lWBCcl4P3BTOGSpQXZWDoASRQ';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Todavía no hay login (Firebase Auth) en este demo, así que el email queda
-// fijo acá. Cuando se agregue el login real, este valor debería salir de la
-// sesión autenticada en vez de estar hardcodeado.
-const CURRENT_USER_EMAIL = 'dayana.alvarado@connect.inc';
+// Email de la persona autenticada — se llena en onLoginSuccess() una vez que
+// Firebase Auth confirma la sesión. No hay valor por defecto: sin login no
+// se carga ningún rol.
+let CURRENT_USER_EMAIL = null;
+
+/* --- Login (Firebase Auth, mismo patrón que AuditQA / Panel Agents / KAI Academy) ---
+   Reutiliza el proyecto kai-academy-connect. Pegá acá el firebaseConfig real
+   (Firebase Console → Configuración del proyecto → Tus apps → SDK de Firebase). */
+const firebaseConfig = {
+  apiKey: "PEGAR_AQUI",
+  authDomain: "kai-academy-connect.firebaseapp.com",
+  projectId: "kai-academy-connect",
+  storageBucket: "PEGAR_AQUI",
+  messagingSenderId: "PEGAR_AQUI",
+  appId: "PEGAR_AQUI"
+};
+firebase.initializeApp(firebaseConfig);
+
+const DOMINIOS_PERMITIDOS = ['connect.inc']; // sumar acá otros dominios aliados si hace falta
+
+function dominioPermitido(email){
+  const dominio = (email || '').split('@')[1] || '';
+  return DOMINIOS_PERMITIDOS.includes(dominio.toLowerCase());
+}
+
+function iniciarSesion(){
+  const errSlot = document.getElementById('login-error');
+  errSlot.innerHTML = '';
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ hd: 'connect.inc' }); // sugiere el dominio en el selector de cuenta de Google
+
+  firebase.auth().signInWithPopup(provider)
+    .then(result => {
+      const email = result.user.email;
+      if(!dominioPermitido(email)){
+        firebase.auth().signOut();
+        errSlot.innerHTML = `<div class="error-box">Tu cuenta (${esc(email)}) no pertenece a Connect. Iniciá sesión con tu correo @connect.inc.</div>`;
+        btn.disabled = false;
+        return;
+      }
+      onLoginSuccess(result.user);
+    })
+    .catch(err => {
+      errSlot.innerHTML = `<div class="error-box">No se pudo iniciar sesión: ${esc(err.message)}</div>`;
+      btn.disabled = false;
+    });
+}
+
+function cerrarSesion(){
+  firebase.auth().signOut();
+}
+
+function onLoginSuccess(user){
+  CURRENT_USER_EMAIL = user.email;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-root').style.display = 'flex';
+
+  const nombre = user.displayName || user.email;
+  const inicial = nombre.charAt(0).toUpperCase();
+  document.querySelector('.avatar').textContent = inicial;
+  document.querySelector('.u-name').textContent = nombre;
+  document.querySelector('.u-email').textContent = user.email;
+
+  cargarRBAC();
+}
+
+// Detecta sesión ya activa (recarga de página) y también cierres de sesión.
+firebase.auth().onAuthStateChanged(user => {
+  if(user && dominioPermitido(user.email)){
+    onLoginSuccess(user);
+  } else {
+    if(user) firebase.auth().signOut(); // sesión de dominio no permitido
+    CURRENT_USER_EMAIL = null;
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-root').style.display = 'none';
+  }
+});
 
 async function cargarRBAC(){
   const badge = document.getElementById('role-badge');
@@ -1205,7 +1322,7 @@ renderCalls();
 renderCasosTable();
 onMetPaisChange();
 document.querySelectorAll('.nav-item').forEach(item => item.style.display = 'none'); // oculto hasta resolver RBAC
-cargarRBAC();
+// cargarRBAC() ya no se llama acá — se dispara desde onAuthStateChanged() al confirmar el login.
 </script>
 
 </body>
