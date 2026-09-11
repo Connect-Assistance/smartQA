@@ -70,9 +70,17 @@ function plainTextToHtml(text) {
     .join('\n');
 }
 
-function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo }) {
+function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo, heliosBase64, heliosMime }) {
   const sem = SEMAFORO_COLORS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS.AMARILLO;
   let html = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+
+  let cuerpoHtml = plainTextToHtml(cuerpo || '');
+  if (heliosBase64) {
+    // La Send Mail API no tiene campo de adjuntos (ver docs/SendMail-API-Connect.pdf) —
+    // la imagen va incrustada como base64 directo dentro del HTML del correo.
+    const mime = heliosMime || 'image/png';
+    cuerpoHtml += `<img src="data:${mime};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;margin:6px 0 14px;display:block;">`;
+  }
 
   html = html
     .replaceAll('{{ASUNTO}}', escapeHtml(asunto || ''))
@@ -80,7 +88,7 @@ function buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo }) {
     .replaceAll('{{SEMAFORO_FG}}', sem.fg)
     .replaceAll('{{SEMAFORO_LABEL}}', sem.label)
     .replaceAll('{{SEMAFORO_RAZON}}', escapeHtml(alerta_razon || ''))
-    .replaceAll('{{CUERPO_HTML}}', plainTextToHtml(cuerpo || ''));
+    .replaceAll('{{CUERPO_HTML}}', cuerpoHtml);
 
   return html;
 }
@@ -108,7 +116,7 @@ app.http('sendEmail', {
       return { status: 400, headers: corsHeaders(), jsonBody: { error: 'Body inválido, se esperaba JSON.' } };
     }
 
-    const { dirigido, asunto, alerta, alerta_razon, cuerpo } = body || {};
+    const { dirigido, asunto, alerta, alerta_razon, cuerpo, heliosBase64, heliosMime } = body || {};
 
     if (!dirigido || !cuerpo) {
       return { status: 400, headers: corsHeaders(), jsonBody: { error: 'Falta "dirigido" o "cuerpo".' } };
@@ -119,7 +127,7 @@ app.http('sendEmail', {
     }
 
     try {
-      const htmlBody = buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo });
+      const htmlBody = buildEmailHtml({ asunto, alerta, alerta_razon, cuerpo, heliosBase64, heliosMime });
 
       const response = await fetch(SEND_MAIL_API_URL, {
         method: 'POST',

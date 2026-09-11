@@ -21,3 +21,7 @@ Versión base del demo, con todo lo construido hasta ahora:
 - RBAC real vía Supabase (proyecto compartido `dednkgonnirybnpktbzp`) — roles admin / configurador / analista.
 - Datos de ejemplo de Overview/Casos/Métricas limpiados a cero, listos para operación real.
 - Azure Function de referencia (`azure-function/`) con `generateEmail` y `sendEmail`, no conectada todavía al demo en producción.
+
+## v0.2.1 — 2026-09-11
+
+- La evidencia Helios (imagen adjunta) ahora se incrusta como base64 directo dentro del HTML del correo (`<img src="data:...;base64,...">`), tanto en la Vista previa del demo como en el envío real vía `sendEmail`. La Send Mail API no tiene campo de adjuntos (ver `docs/SendMail-API-Connect.pdf`), así que viaja como parte del `message`, no como attachment aparte.

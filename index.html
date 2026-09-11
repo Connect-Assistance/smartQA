@@ -322,7 +322,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.2.0</div>
+    <div class="login-version">v0.1.0</div>
   </div>
 </div>
 
@@ -999,13 +999,17 @@ function plainTextToHtmlEmail(text){
 
 function buildEmailPreviewHtml({asunto, alerta, alerta_razon, cuerpo}){
   const sem = SEMAFORO_COLORS_JS[(alerta || 'AMARILLO').toUpperCase()] || SEMAFORO_COLORS_JS.AMARILLO;
+  let cuerpoHtml = plainTextToHtmlEmail(cuerpo || '');
+  if(heliosBase64){
+    cuerpoHtml += `<img src="data:${heliosMime || 'image/png'};base64,${heliosBase64}" alt="Evidencia Helios" style="max-width:100%;border-radius:8px;margin:6px 0 14px;display:block;">`;
+  }
   return EMAIL_TEMPLATE_HTML
     .replaceAll('{{ASUNTO}}', escapeHtmlEmail(asunto || ''))
     .replaceAll('{{SEMAFORO_BG}}', sem.bg)
     .replaceAll('{{SEMAFORO_FG}}', sem.fg)
     .replaceAll('{{SEMAFORO_LABEL}}', sem.label)
     .replaceAll('{{SEMAFORO_RAZON}}', escapeHtmlEmail(alerta_razon || ''))
-    .replaceAll('{{CUERPO_HTML}}', plainTextToHtmlEmail(cuerpo || ''));
+    .replaceAll('{{CUERPO_HTML}}', cuerpoHtml);
 }
 
 /* --- Generación local del correo (sin API, sin key) ---
@@ -1252,6 +1256,8 @@ async function enviarCorreo(){
         alerta: lastAlerta,
         alerta_razon: lastAlertaRazon,
         cuerpo: lastEmailText,
+        heliosBase64: heliosBase64 || undefined,
+        heliosMime: heliosMime || undefined,
       }),
     });
     const data = await response.json().catch(()=>({}));
