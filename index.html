@@ -234,10 +234,6 @@
   .empty-state p{font-size:13px;max-width:250px;line-height:1.5;margin:0;}
 
   .semaforo-line{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#FAFBFD;}
-  .view-toggle{display:flex;gap:4px;margin-left:auto;}
-  .vt{border:1px solid var(--border);background:#fff;color:var(--text-600);font-family:'Roboto',sans-serif;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:16px;cursor:pointer;margin-left:auto;}
-  .vt:hover{border-color:var(--accent);}
-  .vt.active{background:var(--ink);color:#fff;border-color:var(--ink);}
   #email-preview-frame{width:100%;height:460px;border:none;display:block;background:#F5F6FA;}
   .semaforo-reason{font-size:12px;color:var(--text-600);}
   .email-subject{padding:12px 22px 0;font-size:13px;color:var(--text-900);}
@@ -246,6 +242,7 @@
   .outline-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-family:'Roboto',sans-serif;font-weight:600;font-size:12.5px;color:var(--text-900);cursor:pointer;}
   .outline-btn:hover{border-color:var(--accent);color:var(--accent);}
   .outline-btn.solid{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .outline-btn.active{background:var(--accent-wash);border-color:var(--accent);color:var(--accent-dark);}
   .outline-btn.solid:hover{background:#000;}
   .outline-btn.solid:disabled{opacity:0.6;cursor:default;}
   .sent-box{
@@ -320,7 +317,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.4.0</div>
+    <div class="login-version">v0.4.1</div>
   </div>
 </div>
 
@@ -1253,7 +1250,6 @@ function renderOutput(parsed){
     <div class="semaforo-line">
       <span class="pill ${semColor}">${semColor.charAt(0).toUpperCase()+semColor.slice(1)}</span>
       <span class="semaforo-reason">${esc(semReason)}</span>
-      <button class="vt" id="vt-edit" onclick="toggleEditPreview()">Editar</button>
     </div>
     ${lastEmailSubject ? `<div class="email-subject"><strong>Asunto:</strong> ${esc(lastEmailSubject)}</div>` : ''}
     <div id="preview-wrap">
@@ -1264,9 +1260,11 @@ function renderOutput(parsed){
         <svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
         Copiar texto
       </button>
-      <button class="outline-btn" onclick="abrirGmail()">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Abrir en Gmail
+      <button class="outline-btn" id="edit-save-btn" onclick="toggleEditPreview()">
+        <span id="edit-save-label">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Editar
+        </span>
       </button>
       <button class="outline-btn solid" id="send-btn" onclick="enviarCorreo()">
         <span id="send-label">
@@ -1289,22 +1287,27 @@ function escAttr(str){
 // o se envía por la API.
 function toggleEditPreview(){
   const frame = document.getElementById('email-preview-frame');
-  const cuerpo = frame.contentDocument.getElementById('cuerpo-content');
-  const btn = document.getElementById('vt-edit');
+  const doc = frame && frame.contentDocument;
+  const cuerpo = doc && doc.getElementById('cuerpo-content');
+  const btn = document.getElementById('edit-save-btn');
+  const label = document.getElementById('edit-save-label');
+  if(!cuerpo){ console.error('No se encontró el cuerpo editable dentro de la vista previa.'); return; }
+
   const editando = cuerpo.isContentEditable;
 
   if(editando){
+    // Guardar: deja de editar, el contenido ya quedó reflejado (es el mismo DOM que se lee al enviar/copiar).
     cuerpo.contentEditable = 'false';
     cuerpo.style.outline = 'none';
-    btn.textContent = 'Editar';
     btn.classList.remove('active');
+    label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Editar';
   } else {
     cuerpo.contentEditable = 'true';
     cuerpo.style.outline = '2px dashed var(--accent)';
     cuerpo.style.outlineOffset = '2px';
     cuerpo.focus();
-    btn.textContent = 'Listo';
     btn.classList.add('active');
+    label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Guardar';
   }
 }
 
@@ -1325,14 +1328,6 @@ function getCuerpoTextoActual(){
 
 function copiarTexto(){ navigator.clipboard.writeText(getCuerpoTextoActual()); }
 
-function abrirGmail(){
-  const to = encodeURIComponent(document.getElementById('f-dirigido').value || '');
-  const po = document.getElementById('f-po').value;
-  const operador = document.getElementById('f-operador').value;
-  const subject = encodeURIComponent(lastEmailSubject || `Trazabilidad de calidad – Caso ${po} – ${operador}`);
-  const body = encodeURIComponent(getCuerpoTextoActual());
-  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank');
-}
 
 // Proxy real de la Send Mail API — ya maneja el Bearer token del lado de
 // Azure, así que el navegador le puede pegar directo sin exponer nada.
@@ -1373,18 +1368,28 @@ async function enviarCorreo(){
       };
     }
 
-    const response = await fetch(SEND_EMAIL_ENDPOINT, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s, para no quedar colgado sin avisar
+
+    let response;
+    try{
+      response = await fetch(SEND_EMAIL_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const data = await response.json().catch(()=>({}));
     if(!response.ok){ throw new Error(data.error || ('La API respondió con error ' + response.status)); }
 
     const hora = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
     status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora}</div>`;
   } catch(err){
-    status.innerHTML = `<div class="error-box">No se pudo enviar el correo: ${esc(err.message)}</div>`;
+    const mensaje = err.name === 'AbortError' ? 'La función no respondió en 25 segundos (timeout).' : err.message;
+    status.innerHTML = `<div class="error-box">No se pudo enviar el correo: ${esc(mensaje)}</div>`;
   } finally {
     btn.disabled = false;
     label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg> Enviar correo';
