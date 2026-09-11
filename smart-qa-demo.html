@@ -317,7 +317,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.4.1</div>
+    <div class="login-version">v0.5.0</div>
   </div>
 </div>
 
@@ -390,15 +390,15 @@
         <div class="metric-grid">
           <div class="metric-card">
             <div class="m-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <div class="m-num">0</div><div class="m-lbl">Casos por mes · 5 países</div>
+            <div class="m-num" id="ov-casos">0</div><div class="m-lbl">Casos por mes · 5 países</div>
           </div>
           <div class="metric-card">
             <div class="m-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg></div>
-            <div class="m-num">0h</div><div class="m-lbl">Tiempo recuperado / mes</div>
+            <div class="m-num" id="ov-horas">0h</div><div class="m-lbl">Tiempo recuperado / mes</div>
           </div>
           <div class="metric-card">
             <div class="m-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0113 0" stroke-linecap="round"/><path d="M16.5 20a5.5 5.5 0 00-3.4-7" stroke-linecap="round"/><circle cx="17" cy="8.5" r="2.6"/></svg></div>
-            <div class="m-num">0</div><div class="m-lbl">Personas equivalentes liberadas</div>
+            <div class="m-num" id="ov-personas">0</div><div class="m-lbl">Personas equivalentes liberadas</div>
           </div>
           <div class="metric-card">
             <div class="m-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5c0-1.4 1.3-2.5 3-2.5s3 1 3 2.2c0 2.8-6 1.3-6 4.1 0 1.4 1.3 2.5 3 2.5s3-1.1 3-2.5" stroke-linecap="round"/></svg></div>
@@ -413,16 +413,18 @@
             <tbody>
               <tr><td>Tiempo por caso (1–2 llamadas)</td><td>38 min</td><td>22 min</td><td>—</td></tr>
               <tr><td>Tiempo por caso (3+ llamadas)</td><td>45 min</td><td>25 min</td><td>—</td></tr>
-              <tr><td>Horas recuperadas / mes</td><td>—</td><td>—</td><td>0h</td></tr>
+              <tr><td>Horas recuperadas / mes</td><td>—</td><td>—</td><td id="ov-horas-tabla">0h</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="section-card">
           <div class="section-head"><h2>Casos recientes</h2><span class="sh-sub">Datos reales de operación</span></div>
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
-            <p>Todavía no hay casos generados. Van a aparecer acá a medida que el equipo empiece a usar SMART QA.</p>
+          <div id="ov-casos-recientes">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+              <p>Todavía no hay casos generados. Van a aparecer acá a medida que el equipo empiece a usar SMART QA.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -764,6 +766,8 @@ async function cargarRBAC(){
     aplicarPermisos(allowed);
     badge.textContent = roleName.charAt(0).toUpperCase() + roleName.slice(1);
 
+    cargarCasosReales(); // carga Overview/Casos/Métricas con datos reales una vez confirmado el acceso
+
   } catch (err) {
     console.error('Error cargando RBAC de SmartQA:', err);
     badge.textContent = 'Sin rol asignado';
@@ -785,23 +789,97 @@ function aplicarPermisos(allowed){
   }
 }
 
-/* --- Casos: sin datos de ejemplo — se van a cargar acá a medida que se generen casos reales --- */
-const MOCK_CASOS = [];
+/* --- Casos: datos reales desde Supabase (smartqa_casos) --- */
+let casosReales = [];
+
+function mapCasoDb(row){
+  const d = row.enviado_at ? new Date(row.enviado_at) : new Date();
+  const fecha = d.toLocaleDateString('es-CR', {day:'2-digit', month:'short', year:'numeric'});
+  return {
+    estado: (row.alerta || 'amarillo').toLowerCase(),
+    po: row.po || '',
+    cliente: row.cliente || '',
+    cuenta: row.cuenta || '',
+    tipo: row.tipo_servicio || '',
+    fecha,
+    dirigido: row.dirigido || '',
+    pais: row.pais || '',
+    enviado_at: row.enviado_at,
+  };
+}
+
+async function cargarCasosReales(){
+  try{
+    const { data, error } = await supabaseClient
+      .from('smartqa_casos')
+      .select('*')
+      .order('enviado_at', { ascending: false })
+      .limit(200);
+    if(error) throw error;
+    casosReales = (data || []).map(mapCasoDb);
+  } catch(err){
+    console.error('No se pudieron cargar los casos reales de smartqa_casos:', err);
+    casosReales = [];
+  }
+  renderCasosTable();
+  renderOverviewDesdeCasos();
+  renderMetricas();
+}
+
+function renderOverviewDesdeCasos(){
+  const total = casosReales.length;
+  const horas = Math.round(total * 0.29);
+  const personas = (horas / 160).toFixed(1);
+
+  const ovCasos = document.getElementById('ov-casos');
+  const ovHoras = document.getElementById('ov-horas');
+  const ovHorasTabla = document.getElementById('ov-horas-tabla');
+  const ovPersonas = document.getElementById('ov-personas');
+  if(ovCasos) ovCasos.textContent = total;
+  if(ovHoras) ovHoras.textContent = horas + 'h';
+  if(ovHorasTabla) ovHorasTabla.textContent = horas + 'h';
+  if(ovPersonas) ovPersonas.textContent = personas;
+
+  const cont = document.getElementById('ov-casos-recientes');
+  if(!cont) return;
+  if(total === 0){
+    cont.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+      <p>Todavía no hay casos generados. Van a aparecer acá a medida que el equipo empiece a usar SMART QA.</p>
+    </div>`;
+    return;
+  }
+  const labelMap = {verde:'Verde', amarillo:'Amarillo', rojo:'Rojo'};
+  const filas = casosReales.slice(0, 5).map(c => `
+    <tr>
+      <td><span class="pill ${c.estado}">${labelMap[c.estado] || c.estado}</span></td>
+      <td><div class="cell-main">PO ${esc(c.po)}</div><div class="cell-sub">${esc(c.cliente)}</div></td>
+      <td>${esc(c.pais)}</td>
+      <td>${esc(c.cuenta)}</td>
+      <td>${esc(c.fecha)}</td>
+    </tr>
+  `).join('');
+  cont.innerHTML = `<table>
+    <thead><tr><th>Estado</th><th>Caso</th><th>País</th><th>Operador</th><th>Fecha</th></tr></thead>
+    <tbody>${filas}</tbody>
+  </table>`;
+}
 
 let filtroActivo = 'todos';
 
 function renderCasosTable(){
   const tbody = document.getElementById('casos-tbody');
+  if(!tbody) return;
   const search = (document.getElementById('casos-search')?.value || '').toLowerCase();
-  const rows = MOCK_CASOS.filter(c => {
+  const rows = casosReales.filter(c => {
     const matchFiltro = filtroActivo === 'todos' || c.estado === filtroActivo;
-    const matchSearch = !search || c.po.includes(search) || c.cliente.toLowerCase().includes(search) || c.cuenta.toLowerCase().includes(search);
+    const matchSearch = !search || c.po.toLowerCase().includes(search) || c.cliente.toLowerCase().includes(search) || c.cuenta.toLowerCase().includes(search);
     return matchFiltro && matchSearch;
   });
   const labelMap = {verde:'Verde', amarillo:'Amarillo', rojo:'Rojo'};
   tbody.innerHTML = rows.map(c => `
     <tr>
-      <td><span class="pill ${c.estado}">${labelMap[c.estado]}</span></td>
+      <td><span class="pill ${c.estado}">${labelMap[c.estado] || c.estado}</span></td>
       <td><div class="cell-main">PO ${esc(c.po)}</div><div class="cell-sub">${esc(c.cliente)}</div></td>
       <td>${esc(c.cuenta)}</td>
       <td>${esc(c.tipo)}</td>
@@ -902,14 +980,66 @@ function metricasEmptyState(mensaje){
 }
 
 function renderMetricas(){
-  document.getElementById('bars-pais').innerHTML = metricasEmptyState('Todavía no hay casos generados para ningún país.');
-  document.getElementById('bars-semaforo').innerHTML = metricasEmptyState('Todavía no hay casos generados.');
-  document.getElementById('bars-semana').innerHTML = metricasEmptyState('Todavía no hay casos generados esta semana.');
+  const pais = document.getElementById('met-pais').value;
+  const cuenta = document.getElementById('met-cuenta').value;
+  const estado = document.getElementById('met-estado').value;
+  const desde = document.getElementById('met-desde').value;
+  const hasta = document.getElementById('met-hasta').value;
 
-  document.getElementById('met-casos').textContent = '0';
-  document.getElementById('met-tiempo').textContent = '—';
-  document.getElementById('met-verde-pct').textContent = '—';
-  document.getElementById('met-horas').textContent = '0h';
+  const filtrados = casosReales.filter(c => {
+    if(pais !== 'todos' && c.pais !== pais) return false;
+    if(cuenta !== 'todas' && c.cuenta !== cuenta) return false;
+    if(estado !== 'todos' && c.estado !== estado) return false;
+    if(desde && c.enviado_at && new Date(c.enviado_at) < new Date(desde + 'T00:00:00')) return false;
+    if(hasta && c.enviado_at && new Date(c.enviado_at) > new Date(hasta + 'T23:59:59')) return false;
+    return true;
+  });
+  const total = filtrados.length;
+
+  // Casos por país
+  const porPais = {};
+  filtrados.forEach(c => { const p = c.pais || 'Sin país'; porPais[p] = (porPais[p]||0)+1; });
+  const paisEntries = Object.entries(porPais).sort((a,b)=>b[1]-a[1]);
+  const maxPais = Math.max(1, ...paisEntries.map(e=>e[1]));
+  document.getElementById('bars-pais').innerHTML = paisEntries.length
+    ? paisEntries.map(([nombre,count])=>{
+        const pct = Math.max(6, Math.round((count/maxPais)*100));
+        return `<div class="bar-h-row"><span class="bar-h-lbl">${esc(nombre)}</span><div class="bar-h-track"><div class="bar-h-fill" style="width:${pct}%"></div></div><span class="bar-h-val">${count}</span></div>`;
+      }).join('')
+    : metricasEmptyState('Todavía no hay casos generados para ningún país.');
+
+  // Distribución del semáforo
+  const porEstado = {verde:0, amarillo:0, rojo:0};
+  filtrados.forEach(c => { if(porEstado[c.estado] !== undefined) porEstado[c.estado]++; });
+  document.getElementById('bars-semaforo').innerHTML = total
+    ? Object.entries(porEstado).map(([k,count])=>{
+        const pct = Math.round((count/total)*100);
+        const label = k.charAt(0).toUpperCase()+k.slice(1);
+        return `<div class="bar-h-row"><span class="bar-h-lbl">${label}</span><div class="bar-h-track"><div class="bar-h-fill ${k}" style="width:${pct}%"></div></div><span class="bar-h-val">${count} · ${pct}%</span></div>`;
+      }).join('')
+    : metricasEmptyState('Todavía no hay casos generados.');
+
+  // Casos por semana (últimas 6 semanas)
+  const hoy = new Date();
+  const semanas = [0,0,0,0,0,0];
+  filtrados.forEach(c => {
+    if(!c.enviado_at) return;
+    const diffDias = Math.floor((hoy - new Date(c.enviado_at)) / (1000*60*60*24));
+    const idx = 5 - Math.floor(diffDias / 7);
+    if(idx >= 0 && idx <= 5) semanas[idx]++;
+  });
+  const maxSemana = Math.max(1, ...semanas);
+  document.getElementById('bars-semana').innerHTML = total
+    ? semanas.map((count,i)=>{
+        const height = Math.max(4, Math.round((count/maxSemana)*100));
+        return `<div class="bar-v-col"><div class="bar-v-track"><div class="bar-v-fill" style="height:${height}%"></div></div><span class="bar-v-lbl">S${i+1}</span></div>`;
+      }).join('')
+    : metricasEmptyState('Todavía no hay casos generados esta semana.');
+
+  document.getElementById('met-casos').textContent = total;
+  document.getElementById('met-tiempo').textContent = '—'; // no hay dato real de duración por caso todavía
+  document.getElementById('met-verde-pct').textContent = total ? Math.round((porEstado.verde/total)*100) + '%' : '—';
+  document.getElementById('met-horas').textContent = Math.round(total * 0.29) + 'h';
 }
 
 function collectCaseData(){
@@ -1335,6 +1465,30 @@ const SEND_EMAIL_ENDPOINT = 'https://audit-qa-bceva8a6byeyehgx.eastus2-01.azurew
 
 const MIME_TO_EXT_JS = {'image/png':'png','image/jpeg':'jpg','image/jpg':'jpg','image/webp':'webp','image/gif':'gif'};
 
+/* --- Persistencia real de casos (Supabase) — alimenta Overview, Casos y Métricas --- */
+async function guardarCasoEnviado(dirigido){
+  try{
+    await supabaseClient.from('smartqa_casos').insert({
+      po: document.getElementById('f-po').value || null,
+      pais: document.getElementById('f-pais').value || null,
+      cuenta: document.getElementById('f-operador').value || null,
+      tipo_caso: document.getElementById('f-tipo-caso').value || null,
+      tipo_servicio: document.getElementById('f-tipo').value || null,
+      placa: document.getElementById('f-placa').value || null,
+      cliente: document.getElementById('f-cliente').value || null,
+      dirigido: dirigido,
+      asunto: lastEmailSubject || null,
+      alerta: lastAlerta || null,
+      alerta_razon: lastAlertaRazon || null,
+      cuerpo: getCuerpoTextoActual(),
+      enviado_por: CURRENT_USER_EMAIL || null,
+    });
+  } catch(err){
+    console.error('No se pudo guardar el caso en smartqa_casos:', err);
+    // No interrumpe el flujo — el correo ya se mandó igual, esto es solo el registro para métricas.
+  }
+}
+
 async function enviarCorreo(){
   const btn = document.getElementById('send-btn');
   const label = document.getElementById('send-label');
@@ -1387,6 +1541,7 @@ async function enviarCorreo(){
 
     const hora = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
     status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora}</div>`;
+    guardarCasoEnviado(dirigido);
   } catch(err){
     const mensaje = err.name === 'AbortError' ? 'La función no respondió en 25 segundos (timeout).' : err.message;
     status.innerHTML = `<div class="error-box">No se pudo enviar el correo: ${esc(mensaje)}</div>`;

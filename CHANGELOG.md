@@ -58,3 +58,9 @@ Versión base del demo, con todo lo construido hasta ahora:
 
 - Reemplaza el botón "Abrir en Gmail" (ya no hace falta) por "Editar" en la fila de acciones, con su contraparte "Guardar" cuando está en modo edición — flujo explícito de dos pasos en vez de un toggle chico que era fácil de no notar.
 - Agrega timeout de 25s al envío por la API — si no responde en ese tiempo, muestra un error claro en vez de quedar colgado indefinidamente en "Enviando...".
+
+## v0.5.0 — 2026-09-11
+
+- Persistencia real de casos: cada correo enviado con éxito se guarda en la tabla `smartqa_casos` de Supabase (mismo proyecto RBAC compartido). SQL de creación en `supabase/casos-table.sql`.
+- Overview, Casos y Métricas ahora leen de esa tabla en vez de mostrar ceros fijos — casos por país, distribución del semáforo, casos por semana, y los filtros de Métricas (país/cuenta/fecha/estado) ya calculan sobre datos reales.
+- "Tiempo promedio por caso" queda en "—" hasta que haya una forma real de medir duración por caso — no se inventa ese número.
