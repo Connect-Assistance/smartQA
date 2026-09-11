@@ -35,3 +35,7 @@ Versión base del demo, con todo lo construido hasta ahora:
 ## v0.2.2.1 — 2026-09-11 (fix)
 
 - Corrige el número de versión visible en el login, que se había quedado en v0.1.0 por un error mío en el proceso de deploy anterior (bumpeaba la copia del clon temporal, no el archivo fuente, así que el próximo deploy volvía a pisarlo). El contenido funcional ya estaba correcto desde v0.2.2 — este fix es solo del número mostrado.
+
+## v0.3.0 — 2026-09-11
+
+- Elimina por completo el modo simulado de "Enviar correo". El botón ahora siempre hace el request real contra `sendEmail` (nuestra Function App), que a su vez llama a la Send Mail API del lado del servidor. Si la URL todavía no está configurada, muestra un error claro en vez de fingir un envío exitoso.

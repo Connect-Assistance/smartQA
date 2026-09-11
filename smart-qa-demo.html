@@ -322,7 +322,7 @@
       Continuar con Google
     </button>
     <div id="login-error"></div>
-    <div class="login-version">v0.2.2</div>
+    <div class="login-version">v0.3.0</div>
   </div>
 </div>
 
@@ -1240,12 +1240,9 @@ async function enviarCorreo(){
   status.innerHTML = '';
 
   if(!SEND_EMAIL_ENDPOINT){
-    setTimeout(()=>{
-      const hora = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
-      status.innerHTML = `<div class="sent-box"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo enviado a ${esc(dirigido)} · ${hora} <span class="sent-tag">simulado</span></div>`;
-      btn.disabled = false;
-      label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg> Enviar correo';
-    }, 900);
+    status.innerHTML = `<div class="error-box">Falta configurar la URL de la función de envío (SEND_EMAIL_ENDPOINT).</div>`;
+    btn.disabled = false;
+    label.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg> Enviar correo';
     return;
   }
 
